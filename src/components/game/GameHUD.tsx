@@ -187,63 +187,6 @@ function ControlsHelp() {
 
 // ===== Main HUD =====
 export default function GameHUD() {
-  const movePlayer = useGameStore(s => s.movePlayer);
-  const rotatePlayer = useGameStore(s => s.rotatePlayer);
-  const setTarget = useGameStore(s => s.setTarget);
-  const enemies = useGameStore(s => s.enemies);
-  const targetId = useGameStore(s => s.targetId);
-  const playerRotation = useGameStore(s => s.playerRotation);
-  const resetGame = useGameStore(s => s.resetGame);
-
-  useEffect(() => {
-    const keys = new Set<string>();
-    const speed = 0.15;
-
-    const onDown = (e: KeyboardEvent) => {
-      keys.add(e.key.toLowerCase());
-
-      // Tab targeting
-      if (e.key === 'Tab') {
-        e.preventDefault();
-        const alive = enemies.filter(en => !en.ham.isDead);
-        if (alive.length === 0) return;
-        const currentIdx = alive.findIndex(en => en.actorId === targetId);
-        const next = alive[(currentIdx + 1) % alive.length];
-        setTarget(next.actorId);
-      }
-
-      // Reset
-      if (e.key.toLowerCase() === 'r') resetGame();
-    };
-    const onUp = (e: KeyboardEvent) => keys.delete(e.key.toLowerCase());
-
-    const moveLoop = setInterval(() => {
-      let dx = 0, dz = 0;
-      const sin = Math.sin(playerRotation);
-      const cos = Math.cos(playerRotation);
-
-      // W = forward (away from camera)
-      if (keys.has('w')) { dx -= sin * speed; dz -= cos * speed; }
-      if (keys.has('s')) { dx += sin * speed; dz += cos * speed; }
-      // A/D = turn
-      if (keys.has('a')) rotatePlayer(0.03);
-      if (keys.has('d')) rotatePlayer(-0.03);
-      // Q/E = strafe
-      if (keys.has('q')) { dx -= cos * speed; dz += sin * speed; }
-      if (keys.has('e')) { dx += cos * speed; dz -= sin * speed; }
-
-      if (dx !== 0 || dz !== 0) movePlayer(dx, dz);
-    }, 16);
-
-    window.addEventListener('keydown', onDown);
-    window.addEventListener('keyup', onUp);
-    return () => {
-      window.removeEventListener('keydown', onDown);
-      window.removeEventListener('keyup', onUp);
-      clearInterval(moveLoop);
-    };
-  }, [enemies, targetId, playerRotation]);
-
   return (
     <div className="absolute inset-0 pointer-events-none [&>*]:pointer-events-auto">
       <PlayerFrame />
@@ -251,6 +194,81 @@ export default function GameHUD() {
       <AbilityHotbar />
       <CombatLog />
       <ControlsHelp />
+      <InputController />
     </div>
   );
+}
+
+// ===== Input Controller — uses refs so it never re-mounts =====
+function InputController() {
+  const keysRef = useRef(new Set<string>());
+  const storeRef = useRef(useGameStore.getState());
+
+  // Keep storeRef always fresh without re-renders
+  useEffect(() => {
+    const unsub = useGameStore.subscribe((s) => { storeRef.current = s; });
+    return unsub;
+  }, []);
+
+  // Key listeners — mounted exactly once
+  useEffect(() => {
+    const onDown = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      keysRef.current.add(key);
+
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const s = storeRef.current;
+        const alive = s.enemies.filter(en => !en.ham.isDead);
+        if (alive.length === 0) return;
+        const idx = alive.findIndex(en => en.actorId === s.targetId);
+        s.setTarget(alive[(idx + 1) % alive.length].actorId);
+      }
+
+      if (key === 'r') storeRef.current.resetGame();
+    };
+    const onUp = (e: KeyboardEvent) => keysRef.current.delete(e.key.toLowerCase());
+
+    window.addEventListener('keydown', onDown);
+    window.addEventListener('keyup', onUp);
+    return () => { window.removeEventListener('keydown', onDown); window.removeEventListener('keyup', onUp); };
+  }, []); // empty deps — never re-mounts
+
+  // Movement tick — 60fps, reads rotation from store via ref
+  useEffect(() => {
+    let lastTime = performance.now();
+    let rafId: number;
+
+    const loop = () => {
+      rafId = requestAnimationFrame(loop);
+      const now = performance.now();
+      const dt = Math.min((now - lastTime) / 1000, 0.05);
+      lastTime = now;
+
+      const keys = keysRef.current;
+      if (keys.size === 0) return;
+
+      const s = storeRef.current;
+      const speed = 8 * dt; // 8 units/sec
+      const turnSpeed = 2.5 * dt; // rad/sec
+      const rot = s.playerRotation;
+      const sin = Math.sin(rot);
+      const cos = Math.cos(rot);
+
+      let dx = 0, dz = 0;
+      if (keys.has('w')) { dx -= sin * speed; dz -= cos * speed; }
+      if (keys.has('s')) { dx += sin * speed; dz += cos * speed; }
+      if (keys.has('a')) s.rotatePlayer(turnSpeed);
+      if (keys.has('d')) s.rotatePlayer(-turnSpeed);
+      if (keys.has('q')) { dx -= cos * speed; dz += sin * speed; }
+      if (keys.has('e')) { dx += cos * speed; dz -= sin * speed; }
+
+      if (dx !== 0 || dz !== 0) s.movePlayer(dx, dz);
+    };
+
+    rafId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(rafId);
+  }, []); // empty deps — never re-mounts
+
+  return null;
 }
