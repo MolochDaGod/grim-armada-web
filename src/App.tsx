@@ -1,6 +1,7 @@
 import { Suspense, useState } from 'react';
 import DemoScene from './game/scene/DemoScene';
 import GameHUD from './components/game/GameHUD';
+import { Crosshair, HitMarker, DamageFlash } from './game/scene/VFX';
 import { useGameStore } from './game/store';
 
 function LoadingScreen() {
@@ -80,6 +81,9 @@ export default function App() {
         <DemoScene />
       </Suspense>
       <GameHUD />
+      <Crosshair />
+      <HitMarker />
+      <DamageFlash />
     </div>
   );
 }

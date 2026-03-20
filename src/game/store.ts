@@ -5,6 +5,7 @@ import {
   CombatState, Posture, WeaponType, DamageType, SkillModType, HAMType,
   type AttackResult, Species, Faction, Profession,
 } from './core/types';
+import { fireShot, triggerScreenShake, triggerHitMarker, spawnDamageNumber } from './scene/BulletSystem';
 
 // ===== NPC Definition =====
 export interface NPCActor extends ICombatActor {
@@ -138,13 +139,24 @@ export const useGameStore = create<GameStore>((set, get) => {
     const attName = result.attackerId === 'player' ? s.player.name : (s.enemies.find(e => e.actorId === result.attackerId)?.name ?? result.attackerId);
     const tgtName = result.targetId === 'player' ? s.player.name : (s.enemies.find(e => e.actorId === result.targetId)?.name ?? result.targetId);
 
-    // Fire visual bullet
+    // Fire visual bullet + VFX
     if (attacker && target) {
-      try {
-        const { fireShot } = require('./scene/BulletSystem');
-        const color = result.attackerId === 'player' ? '#ffaa22' : '#ff4444';
-        fireShot(attacker.position, target.position, color);
-      } catch { /* BulletSystem not loaded yet */ }
+      const isPlayer = result.attackerId === 'player';
+      fireShot(attacker.position, target.position, isPlayer ? '#ffaa22' : '#ff4444');
+
+      if (result.hit && result.damageDealt > 0) {
+        // Hit marker + damage number
+        if (isPlayer) triggerHitMarker(result.critical);
+        spawnDamageNumber(target.position, result.damageDealt, result.critical, false);
+      } else if (result.hit && result.damageDealt < 0) {
+        // Heal number
+        spawnDamageNumber(target.position, result.damageDealt, false, true);
+      }
+
+      // Screen shake when player takes damage
+      if (result.targetId === 'player' && result.hit && result.damageDealt > 0) {
+        triggerScreenShake(result.critical ? 0.25 : 0.1);
+      }
     }
 
     // Notify animation callbacks

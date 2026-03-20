@@ -5,17 +5,19 @@
   "private": true,
   "scripts": {
     "dev": "vite --port 3000",
-"build": "vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "server": "tsx server/index.ts"
   },
   "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.19.3",
     "@react-three/drei": "^10.0.0",
     "@react-three/fiber": "^9.1.0",
     "@react-three/postprocessing": "^3.0.4",
     "@react-three/rapier": "^2.2.0",
     "cors": "^2.8.5",
     "express": "^4.22.0",
+    "postprocessing": "^6.38.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "three": "^0.172.0",

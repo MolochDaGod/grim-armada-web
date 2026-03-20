@@ -5,8 +5,9 @@ import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import { useGameStore } from '../store';
 import { FBXModel } from './ModelLoader';
-import { BulletRenderer, fireShot } from './BulletSystem';
+import { BulletRenderer } from './BulletSystem';
 import { createAnimState, updateProceduralAnim, updateWeaponAnim, triggerShoot, triggerHit, triggerDeath, type AnimState } from './ProceduralAnim';
+import { ScreenShake, DamageNumbers } from './VFX';
 
 // ===== Model paths =====
 const MODELS = {
@@ -316,11 +317,13 @@ export default function DemoScene() {
       <TPSCamera />
       <GameLoop />
       <BulletRenderer />
+      <ScreenShake />
+      <DamageNumbers />
 
-      {/* Postprocessing: bloom for muzzle flash + bullets, vignette for mood */}
-      <EffectComposer>
-        <Bloom luminanceThreshold={0.8} luminanceSmoothing={0.3} intensity={0.6} />
-        <Vignette offset={0.3} darkness={0.6} />
+      {/* Postprocessing */}
+      <EffectComposer multisampling={4}>
+        <Bloom luminanceThreshold={0.6} luminanceSmoothing={0.2} intensity={0.8} mipmapBlur />
+        <Vignette offset={0.3} darkness={0.65} />
       </EffectComposer>
 
       <Suspense fallback={null}>
