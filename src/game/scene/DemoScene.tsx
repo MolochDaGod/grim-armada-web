@@ -1,9 +1,12 @@
-import { useRef, Suspense } from 'react';
+import { useRef, Suspense, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Text, Stars } from '@react-three/drei';
+import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import { useGameStore } from '../store';
 import { FBXModel } from './ModelLoader';
+import { BulletRenderer, fireShot } from './BulletSystem';
+import { createAnimState, updateProceduralAnim, updateWeaponAnim, triggerShoot, triggerHit, triggerDeath, type AnimState } from './ProceduralAnim';
 
 // ===== Model paths =====
 const MODELS = {
@@ -28,28 +31,59 @@ const MODELS = {
   searchlight: '/models/structures/searchlight.fbx',
 };
 
-// ===== Player Character with Real Model =====
+// ===== Player Character with Procedural Animation =====
 function PlayerCharacter() {
-  const groupRef = useRef<THREE.Group>(null);
+  const outerRef = useRef<THREE.Group>(null);
+  const modelRef = useRef<THREE.Group>(null);
+  const weaponRef = useRef<THREE.Group>(null);
+  const animRef = useRef<AnimState>(createAnimState());
+  const prevPos = useRef<[number, number, number]>([0, 0, 0]);
   const position = useGameStore(s => s.playerPosition);
   const rotation = useGameStore(s => s.playerRotation);
 
-  useFrame(() => {
-    if (groupRef.current) {
-      groupRef.current.position.set(position[0], 0, position[2]);
-      groupRef.current.rotation.y = rotation;
+  // Subscribe to attack events for shoot animation
+  useEffect(() => {
+    const unsub = useGameStore.subscribe((s) => {
+      // Set callback
+    });
+    useGameStore.setState({
+      _onAttackVisual: (result) => {
+        if (result.attackerId === 'player') triggerShoot(animRef.current);
+        if (result.targetId === 'player' && result.hit) triggerHit(animRef.current);
+      },
+    });
+    return unsub;
+  }, []);
+
+  useFrame((_, dt) => {
+    const cdt = Math.min(dt, 0.05);
+    if (outerRef.current) {
+      outerRef.current.position.set(position[0], 0, position[2]);
+      outerRef.current.rotation.y = rotation;
     }
+
+    // Detect movement
+    const dx = position[0] - prevPos.current[0];
+    const dz = position[2] - prevPos.current[2];
+    const speed = Math.sqrt(dx * dx + dz * dz) / cdt;
+    animRef.current.isMoving = speed > 0.5;
+    animRef.current.moveSpeed = Math.min(speed / 10, 1);
+    prevPos.current = [...position];
+
+    // Apply procedural animations
+    if (modelRef.current) updateProceduralAnim(modelRef.current, animRef.current, cdt);
+    if (weaponRef.current) updateWeaponAnim(weaponRef.current, animRef.current, cdt);
   });
 
   return (
-    <group ref={groupRef}>
-      {/* Real player model — Bodyguard */}
-      <FBXModel url={MODELS.player} materialPreset="player" normalizedHeight={1.8} />
-      {/* Weapon attached to right side */}
-      <group position={[0.3, 0.9, -0.2]} rotation={[0, 0, -0.1]}>
+    <group ref={outerRef}>
+      <group ref={modelRef}>
+        <FBXModel url={MODELS.player} materialPreset="player" normalizedHeight={1.8} />
+      </group>
+      {/* Weapon with recoil animation */}
+      <group ref={weaponRef} position={[0.3, 0.9, -0.2]} rotation={[0, 0, -0.1]}>
         <FBXModel url={MODELS.weaponRifle} materialPreset="weapon" normalizedHeight={0.8} />
       </group>
-      {/* Name plate */}
       <Text position={[0, 2.2, 0]} fontSize={0.2} color="#d4af37" anchorX="center" font={undefined}>
         Commander
       </Text>
@@ -57,12 +91,15 @@ function PlayerCharacter() {
   );
 }
 
-// ===== Enemy NPC with Real Models =====
+// ===== Enemy NPC with Real Models + Procedural Animations =====
 function EnemyNPC({ actorId, name, color, pos, level, modelUrl, materialPreset }: {
   actorId: string; name: string; color: string; pos: [number, number, number]; level: number;
   modelUrl: string; materialPreset: 'mutant' | 'alien' | 'spikeball';
 }) {
   const groupRef = useRef<THREE.Group>(null);
+  const modelRef = useRef<THREE.Group>(null);
+  const animRef = useRef<AnimState>(createAnimState());
+  const wasDead = useRef(false);
   const setTarget = useGameStore(s => s.setTarget);
   const targetId = useGameStore(s => s.targetId);
   const enemies = useGameStore(s => s.enemies);
@@ -71,11 +108,20 @@ function EnemyNPC({ actorId, name, color, pos, level, modelUrl, materialPreset }
   const isDead = enemy?.ham.isDead ?? false;
   const healthPct = enemy ? enemy.ham.health.percentage : 1;
 
-  useFrame(() => {
+  useFrame((_, dt) => {
+    const cdt = Math.min(dt, 0.05);
+
+    // Detect death transition
+    if (isDead && !wasDead.current) { triggerDeath(animRef.current); wasDead.current = true; }
+    animRef.current.isDead = isDead;
+
+    // Idle facing rotation
     if (groupRef.current && !isDead) {
-      groupRef.current.position.y = pos[1] + Math.sin(Date.now() * 0.001 + pos[0]) * 0.05;
-      groupRef.current.rotation.y += 0.002;
+      groupRef.current.rotation.y += 0.3 * cdt;
     }
+
+    // Apply procedural animation
+    if (modelRef.current) updateProceduralAnim(modelRef.current, animRef.current, cdt);
   });
 
   return (
@@ -92,12 +138,12 @@ function EnemyNPC({ actorId, name, color, pos, level, modelUrl, materialPreset }
         </mesh>
       )}
 
-      {/* Real enemy model */}
-      <group scale={isDead ? [1, 0.3, 1] : [1, 1, 1]} position={isDead ? [0, -0.5, 0] : [0, 0, 0]}>
+      {/* Real enemy model with procedural animation */}
+      <group ref={modelRef}>
         <FBXModel
           url={modelUrl}
           materialPreset={materialPreset}
-          normalizedHeight={isDead ? 0.5 : (materialPreset === 'spikeball' ? 1.2 : 2.0)}
+          normalizedHeight={materialPreset === 'spikeball' ? 1.2 : 2.0}
         />
       </group>
 
@@ -269,6 +315,13 @@ export default function DemoScene() {
 
       <TPSCamera />
       <GameLoop />
+      <BulletRenderer />
+
+      {/* Postprocessing: bloom for muzzle flash + bullets, vignette for mood */}
+      <EffectComposer>
+        <Bloom luminanceThreshold={0.8} luminanceSmoothing={0.3} intensity={0.6} />
+        <Vignette offset={0.3} darkness={0.6} />
+      </EffectComposer>
 
       <Suspense fallback={null}>
         <Terrain />

@@ -57,6 +57,9 @@ interface GameStore {
   grudgeId: string | null;
   isAuthenticated: boolean;
 
+  // Animation callback (set by scene)
+  _onAttackVisual: ((result: AttackResult) => void) | null;
+
   // Actions
   setTarget: (id: string | null) => void;
   useAbility: (abilityId: string) => void;
@@ -127,11 +130,25 @@ export const useGameStore = create<GameStore>((set, get) => {
   combat.registerActor(playerActor);
   enemies.forEach(e => combat.registerActor(e));
 
-  // Wire combat log
+  // Wire combat log + visual bullet/animation callbacks
   combat.onAttackResult = (result: AttackResult) => {
     const s = get();
+    const attacker = result.attackerId === 'player' ? s.playerActor : s.enemies.find(e => e.actorId === result.attackerId);
+    const target = result.targetId === 'player' ? s.playerActor : s.enemies.find(e => e.actorId === result.targetId);
     const attName = result.attackerId === 'player' ? s.player.name : (s.enemies.find(e => e.actorId === result.attackerId)?.name ?? result.attackerId);
     const tgtName = result.targetId === 'player' ? s.player.name : (s.enemies.find(e => e.actorId === result.targetId)?.name ?? result.targetId);
+
+    // Fire visual bullet
+    if (attacker && target) {
+      try {
+        const { fireShot } = require('./scene/BulletSystem');
+        const color = result.attackerId === 'player' ? '#ffaa22' : '#ff4444';
+        fireShot(attacker.position, target.position, color);
+      } catch { /* BulletSystem not loaded yet */ }
+    }
+
+    // Notify animation callbacks
+    if (s._onAttackVisual) s._onAttackVisual(result);
 
     if (!result.hit) {
       const reason = result.dodged ? 'dodged' : result.blocked ? 'blocked' : 'parried';
@@ -160,6 +177,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     isGameRunning: true,
     grudgeId: null,
     isAuthenticated: false,
+    _onAttackVisual: null,
 
     setTarget: (id) => {
       set({ targetId: id });
