@@ -1,0 +1,256 @@
+import { useEffect, useRef } from 'react';
+import { useGameStore } from '../../game/store';
+import { CombatState } from '../../game/core/types';
+
+// ===== HAM Bar =====
+function HAMBar({ label, current, max, color, barBg }: {
+  label: string; current: number; max: number; color: string; barBg: string;
+}) {
+  const pct = max > 0 ? (current / max) * 100 : 0;
+  return (
+    <div className="mb-1">
+      <div className="flex justify-between text-xs font-semibold" style={{ fontFamily: "'Spectral SC', serif" }}>
+        <span style={{ color }}>{label}</span>
+        <span className="text-[#a39882]">{current}/{max}</span>
+      </div>
+      <div className="h-3 rounded-sm overflow-hidden" style={{ background: barBg, border: `1px solid ${color}40` }}>
+        <div className="h-full transition-all duration-300 rounded-sm" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${color}cc, ${color})` }} />
+      </div>
+    </div>
+  );
+}
+
+// ===== Player Frame =====
+function PlayerFrame() {
+  const ham = useGameStore(s => s.ham);
+  const player = useGameStore(s => s.player);
+  return (
+    <div className="absolute top-4 left-4 w-64 p-3 rounded-lg" style={{
+      background: 'linear-gradient(135deg, #171d28ee, #0f1419ee)',
+      border: '1px solid #7a642040', boxShadow: '0 0 20px #d4af3710',
+    }}>
+      <div className="flex items-center gap-2 mb-2">
+        <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm" style={{ background: '#d4af3730', border: '1px solid #d4af37', color: '#d4af37' }}>
+          {player.level}
+        </div>
+        <div>
+          <div className="text-sm font-bold" style={{ color: '#d4af37', fontFamily: "'Cinzel', serif" }}>{player.name}</div>
+          <div className="text-xs" style={{ color: '#a39882' }}>{player.species} {player.profession}</div>
+        </div>
+      </div>
+      <HAMBar label="HEALTH" current={ham.health.current} max={ham.health.max} color="#d4af37" barBg="#1a1200" />
+      <HAMBar label="ACTION" current={ham.action.current} max={ham.action.max} color="#4a9eff" barBg="#0a1a2a" />
+      <HAMBar label="MIND" current={ham.mind.current} max={ham.mind.max} color="#b56aff" barBg="#1a0a2a" />
+    </div>
+  );
+}
+
+// ===== Target Frame =====
+function TargetFrame() {
+  const targetId = useGameStore(s => s.targetId);
+  const enemies = useGameStore(s => s.enemies);
+  const target = enemies.find(e => e.actorId === targetId);
+
+  if (!target) return null;
+
+  return (
+    <div className="absolute top-4 left-1/2 -translate-x-1/2 w-60 p-3 rounded-lg" style={{
+      background: 'linear-gradient(135deg, #281d17ee, #1a0f09ee)',
+      border: '1px solid #a8643240', boxShadow: '0 0 15px #ff444420',
+    }}>
+      <div className="flex items-center gap-2 mb-2">
+        <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: '#ff444430', border: '1px solid #ff4444', color: '#ff4444' }}>
+          {target.level}
+        </div>
+        <div className="text-sm font-bold" style={{ color: '#ff6666', fontFamily: "'Cinzel', serif" }}>
+          {target.name}
+        </div>
+        {target.ham.isDead && <span className="text-xs text-red-500 ml-auto">DEAD</span>}
+      </div>
+      <HAMBar label="HP" current={target.ham.health.current} max={target.ham.health.max} color="#ef4444" barBg="#1a0808" />
+      <HAMBar label="AP" current={target.ham.action.current} max={target.ham.action.max} color="#3b82f6" barBg="#08101a" />
+      <HAMBar label="MP" current={target.ham.mind.current} max={target.ham.mind.max} color="#a855f7" barBg="#140820" />
+    </div>
+  );
+}
+
+// ===== Ability Hotbar =====
+function AbilityHotbar() {
+  const useAbility = useGameStore(s => s.useAbility);
+  const combat = useGameStore(s => s.combat);
+
+  const abilities = [
+    { id: 'burstShot', key: '1', icon: '🔫', name: 'Burst Shot' },
+    { id: 'headShot', key: '2', icon: '🎯', name: 'Head Shot' },
+    { id: 'powerAttack', key: '3', icon: '⚔️', name: 'Power Attack' },
+    { id: 'healDamage', key: '4', icon: '💚', name: 'Heal' },
+    null, // slot 5 empty
+    { id: 'item_food', key: '6', icon: '🍖', name: 'Food', disabled: true },
+    { id: 'item_potion', key: '7', icon: '🧪', name: 'Potion', disabled: true },
+    { id: 'item_relic', key: '8', icon: '🔮', name: 'Relic', disabled: true },
+  ];
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const idx = parseInt(e.key) - 1;
+      if (idx >= 0 && idx < abilities.length) {
+        const a = abilities[idx];
+        if (a && !('disabled' in a && a.disabled)) useAbility(a.id);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  return (
+    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-1">
+      {abilities.map((a, i) => {
+        if (!a) return (
+          <div key={i} className="w-12 h-12 rounded border opacity-30" style={{ background: '#0f1419', borderColor: '#333' }} />
+        );
+        const cd = combat.getCooldownRemaining('player', a.id);
+        const isDisabled = 'disabled' in a && a.disabled;
+
+        return (
+          <button key={a.id}
+            onClick={() => !isDisabled && useAbility(a.id)}
+            className="w-12 h-12 rounded relative flex flex-col items-center justify-center text-lg cursor-pointer hover:brightness-125 active:scale-95 transition-all"
+            style={{
+              background: isDisabled ? '#1a1a1a' : cd > 0 ? '#1a1a1aaa' : 'linear-gradient(135deg, #1c2333, #283040)',
+              border: `1px solid ${isDisabled ? '#333' : cd > 0 ? '#555' : '#7a6420'}`,
+              opacity: isDisabled ? 0.4 : 1,
+            }}
+            title={`${a.name} [${a.key}]`}
+          >
+            <span>{a.icon}</span>
+            {cd > 0 && (
+              <div className="absolute inset-0 flex items-center justify-center rounded" style={{ background: '#00000088' }}>
+                <span className="text-xs font-bold text-white">{cd.toFixed(1)}</span>
+              </div>
+            )}
+            <span className="absolute -bottom-0.5 right-0.5 text-[8px] font-bold" style={{ color: '#7a6420' }}>{a.key}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ===== Combat Log =====
+function CombatLog() {
+  const combatLog = useGameStore(s => s.combatLog);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [combatLog.length]);
+
+  const colors: Record<string, string> = {
+    damage: '#ef4444', heal: '#4ade80', miss: '#a39882', system: '#d4af37', death: '#ff6600',
+  };
+
+  return (
+    <div className="absolute bottom-20 left-4 w-80 h-40 rounded-lg overflow-hidden" style={{
+      background: '#0f1419cc', border: '1px solid #7a642020',
+    }}>
+      <div className="px-2 py-1 text-xs font-bold" style={{ color: '#d4af37', fontFamily: "'Cinzel', serif", borderBottom: '1px solid #7a642030' }}>
+        Combat Log
+      </div>
+      <div ref={scrollRef} className="overflow-y-auto h-[calc(100%-24px)] px-2 py-1 space-y-0.5">
+        {combatLog.map(entry => (
+          <div key={entry.id} className="text-xs leading-tight" style={{ color: colors[entry.type] || '#ccc' }}>
+            {entry.message}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ===== Controls Help =====
+function ControlsHelp() {
+  return (
+    <div className="absolute top-4 right-4 p-2 rounded-lg text-xs" style={{
+      background: '#0f1419cc', border: '1px solid #7a642020', color: '#a39882',
+    }}>
+      <div className="font-bold mb-1" style={{ color: '#d4af37' }}>Controls</div>
+      <div>W/A/S/D — Move</div>
+      <div>Q/E — Strafe</div>
+      <div>Tab — Cycle targets</div>
+      <div>1-4 — Abilities</div>
+      <div>Click enemy — Target</div>
+      <div>R — Reset game</div>
+    </div>
+  );
+}
+
+// ===== Main HUD =====
+export default function GameHUD() {
+  const movePlayer = useGameStore(s => s.movePlayer);
+  const rotatePlayer = useGameStore(s => s.rotatePlayer);
+  const setTarget = useGameStore(s => s.setTarget);
+  const enemies = useGameStore(s => s.enemies);
+  const targetId = useGameStore(s => s.targetId);
+  const playerRotation = useGameStore(s => s.playerRotation);
+  const resetGame = useGameStore(s => s.resetGame);
+
+  useEffect(() => {
+    const keys = new Set<string>();
+    const speed = 0.15;
+
+    const onDown = (e: KeyboardEvent) => {
+      keys.add(e.key.toLowerCase());
+
+      // Tab targeting
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const alive = enemies.filter(en => !en.ham.isDead);
+        if (alive.length === 0) return;
+        const currentIdx = alive.findIndex(en => en.actorId === targetId);
+        const next = alive[(currentIdx + 1) % alive.length];
+        setTarget(next.actorId);
+      }
+
+      // Reset
+      if (e.key.toLowerCase() === 'r') resetGame();
+    };
+    const onUp = (e: KeyboardEvent) => keys.delete(e.key.toLowerCase());
+
+    const moveLoop = setInterval(() => {
+      let dx = 0, dz = 0;
+      const sin = Math.sin(playerRotation);
+      const cos = Math.cos(playerRotation);
+
+      // W = forward (away from camera)
+      if (keys.has('w')) { dx -= sin * speed; dz -= cos * speed; }
+      if (keys.has('s')) { dx += sin * speed; dz += cos * speed; }
+      // A/D = turn
+      if (keys.has('a')) rotatePlayer(0.03);
+      if (keys.has('d')) rotatePlayer(-0.03);
+      // Q/E = strafe
+      if (keys.has('q')) { dx -= cos * speed; dz += sin * speed; }
+      if (keys.has('e')) { dx += cos * speed; dz -= sin * speed; }
+
+      if (dx !== 0 || dz !== 0) movePlayer(dx, dz);
+    }, 16);
+
+    window.addEventListener('keydown', onDown);
+    window.addEventListener('keyup', onUp);
+    return () => {
+      window.removeEventListener('keydown', onDown);
+      window.removeEventListener('keyup', onUp);
+      clearInterval(moveLoop);
+    };
+  }, [enemies, targetId, playerRotation]);
+
+  return (
+    <div className="absolute inset-0 pointer-events-none [&>*]:pointer-events-auto">
+      <PlayerFrame />
+      <TargetFrame />
+      <AbilityHotbar />
+      <CombatLog />
+      <ControlsHelp />
+    </div>
+  );
+}
