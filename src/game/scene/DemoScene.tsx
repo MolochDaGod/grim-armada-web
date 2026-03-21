@@ -51,7 +51,7 @@ function AudioTracker() {
   return null;
 }
 
-// ===== Player Character with Procedural Animation =====
+// ===== Player Character — uses MUTANT model as the actual character =====
 function PlayerCharacter() {
   const outerRef = useRef<THREE.Group>(null);
   const modelRef = useRef<THREE.Group>(null);
@@ -66,29 +66,26 @@ function PlayerCharacter() {
       outerRef.current.position.set(position[0], 0, position[2]);
       outerRef.current.rotation.y = rotation;
     }
-
-    // Detect movement
     const dx = position[0] - prevPos.current[0];
     const dz = position[2] - prevPos.current[2];
     const speed = Math.sqrt(dx * dx + dz * dz) / cdt;
     animRef.current.isMoving = speed > 0.5;
     animRef.current.moveSpeed = Math.min(speed / 10, 1);
     prevPos.current = [...position];
-
-    // Apply procedural animations
     if (modelRef.current) updateProceduralAnim(modelRef.current, animRef.current, cdt);
   });
 
   return (
     <group ref={outerRef}>
       <group ref={modelRef}>
-        <GLTFModel url={MODELS.player} normalizedHeight={1.8} />
+        {/* Use the ACTUAL mutant model as the player character */}
+        <GLTFModel url={MODELS.mutant} normalizedHeight={2.0} />
       </group>
-      {/* Weapon rendered on character body */}
-      <group position={[0.3, 0.9, -0.2]} rotation={[0, 0, -0.1]}>
-        <GLTFModel url={MODELS.weaponRifle} normalizedHeight={0.8} />
+      {/* Weapon held in right hand area */}
+      <group position={[0.5, 1.0, -0.4]} rotation={[0, 0, -0.15]}>
+        <GLTFModel url={MODELS.weaponRifle} normalizedHeight={1.0} />
       </group>
-      <Text position={[0, 2.2, 0]} fontSize={0.2} color="#d4af37" anchorX="center" font={undefined}>
+      <Text position={[0, 2.5, 0]} fontSize={0.22} color="#d4af37" anchorX="center" font={undefined}>
         Commander
       </Text>
     </group>
@@ -262,78 +259,156 @@ function GameLoop() {
   return null;
 }
 
-// ===== Terrain with GLB models =====
+// ===== Display pedestal for showroom models =====
+function Pedestal({ position, radius = 1.5, height = 0.15 }: { position: [number, number, number]; radius?: number; height?: number }) {
+  return (
+    <mesh position={[position[0], height / 2, position[2]]} receiveShadow castShadow>
+      <cylinderGeometry args={[radius, radius + 0.1, height, 32]} />
+      <meshStandardMaterial color="#2a2a35" metalness={0.6} roughness={0.3} />
+    </mesh>
+  );
+}
+
+// ===== Showroom ground + terrain =====
 function Terrain() {
   return (
     <group>
-      {/* Ground — dark military terrain */}
+      {/* Large ground plane */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} receiveShadow>
-        <planeGeometry args={[120, 120, 32, 32]} />
-        <meshStandardMaterial color="#1a2610" roughness={0.95} />
+        <planeGeometry args={[200, 200, 64, 64]} />
+        <meshStandardMaterial color="#121a0e" roughness={0.95} />
       </mesh>
-      {/* Dirt patches */}
-      {[[5, 0, -3], [-8, 0, 10], [15, 0, 5], [-5, 0, -15], [20, 0, -10]].map((p, i) => (
-        <mesh key={`dirt-${i}`} rotation={[-Math.PI / 2, 0, i * 1.2]} position={p as [number, number, number]} receiveShadow>
-          <circleGeometry args={[2 + i * 0.5, 16]} />
-          <meshStandardMaterial color="#2a2210" roughness={1} />
-        </mesh>
+
+      {/* Landing pad — hexagonal platform where player spawns (the "ship") */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} receiveShadow>
+        <circleGeometry args={[8, 6]} />
+        <meshStandardMaterial color="#1a1a2a" metalness={0.4} roughness={0.5} />
+      </mesh>
+      {/* Pad border ring */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
+        <ringGeometry args={[7.8, 8.2, 6]} />
+        <meshStandardMaterial color="#d4af37" emissive="#d4af37" emissiveIntensity={0.4} metalness={0.8} roughness={0.2} />
+      </mesh>
+
+      {/* The SHIP — cabin model scaled up as the spawn ship */}
+      <GLTFModel url={MODELS.cabin} position={[0, 0.1, 0]} normalizedHeight={6} />
+
+      {/* ===== WEAPON DISPLAY AREA (east side, +X) ===== */}
+      <Text position={[15, 3, 0]} fontSize={0.6} color="#d4af37" anchorX="center" font={undefined}>ARMORY</Text>
+      {/* All 3 weapons on pedestals */}
+      <Pedestal position={[12, 0, -3]} />
+      <GLTFModel url={MODELS.weaponRifle} position={[12, 0.3, -3]} normalizedHeight={1.5} rotation={[0, 0.5, 0]} />
+      <Text position={[12, 2.2, -3]} fontSize={0.18} color="#aaa" anchorX="center" font={undefined}>Assault Rifle</Text>
+
+      <Pedestal position={[15, 0, 0]} />
+      <GLTFModel url={MODELS.weaponAK} position={[15, 0.3, 0]} normalizedHeight={1.5} rotation={[0, -0.3, 0]} />
+      <Text position={[15, 2.2, 0]} fontSize={0.18} color="#aaa" anchorX="center" font={undefined}>AK-74U</Text>
+
+      <Pedestal position={[12, 0, 3]} />
+      <GLTFModel url={MODELS.weaponSMG} position={[12, 0.3, 3]} normalizedHeight={1.5} rotation={[0, 0.8, 0]} />
+      <Text position={[12, 2.2, 3]} fontSize={0.18} color="#aaa" anchorX="center" font={undefined}>SMG</Text>
+
+      {/* Spotlights on weapons */}
+      <pointLight position={[12, 3, -3]} intensity={1} color="#ffdd88" distance={8} />
+      <pointLight position={[15, 3, 0]} intensity={1} color="#ffdd88" distance={8} />
+      <pointLight position={[12, 3, 3]} intensity={1} color="#ffdd88" distance={8} />
+
+      {/* ===== MONSTER GALLERY (west side, -X) ===== */}
+      <Text position={[-18, 4, 0]} fontSize={0.6} color="#ff4444" anchorX="center" font={undefined}>HOSTILES</Text>
+
+      {/* ALIEN — displayed BIG */}
+      <Pedestal position={[-15, 0, -8]} radius={2.5} />
+      <GLTFModel url={MODELS.alien} position={[-15, 0.2, -8]} normalizedHeight={5} rotation={[0, 0.4, 0]} />
+      <Text position={[-15, 5.5, -8]} fontSize={0.25} color="#4ade80" anchorX="center" font={undefined}>Xenomorph Alien</Text>
+      <pointLight position={[-15, 6, -8]} intensity={1.5} color="#22ff44" distance={12} />
+
+      {/* MUTANT — displayed BIG */}
+      <Pedestal position={[-18, 0, 0]} radius={2.5} />
+      <GLTFModel url={MODELS.mutant} position={[-18, 0.2, 0]} normalizedHeight={5} rotation={[0, 0.6, 0]} />
+      <Text position={[-18, 5.5, 0]} fontSize={0.25} color="#a855f7" anchorX="center" font={undefined}>Mutant Berserker</Text>
+      <pointLight position={[-18, 6, 0]} intensity={1.5} color="#aa44ff" distance={12} />
+
+      {/* SPIKEBALL — displayed BIG */}
+      <Pedestal position={[-15, 0, 8]} radius={2} />
+      <GLTFModel url={MODELS.spikeball} position={[-15, 0.2, 8]} normalizedHeight={4} rotation={[0, 1.2, 0]} />
+      <Text position={[-15, 4.5, 8]} fontSize={0.25} color="#ef4444" anchorX="center" font={undefined}>Spikeball Drone</Text>
+      <pointLight position={[-15, 5, 8]} intensity={1.5} color="#ff2222" distance={12} />
+
+      {/* ===== EXTRA MONSTERS scattered in the wild (south, +Z) ===== */}
+      <GLTFModel url={MODELS.alien} position={[-30, 0, 25]} normalizedHeight={4} rotation={[0, 1.0, 0]} />
+      <GLTFModel url={MODELS.alien} position={[-25, 0, 30]} normalizedHeight={3.5} rotation={[0, 2.5, 0]} />
+      <GLTFModel url={MODELS.mutant} position={[25, 0, 28]} normalizedHeight={4} rotation={[0, -0.5, 0]} />
+      <GLTFModel url={MODELS.mutant} position={[30, 0, 20]} normalizedHeight={3} rotation={[0, 1.8, 0]} />
+      <GLTFModel url={MODELS.spikeball} position={[0, 0, 35]} normalizedHeight={3} rotation={[0, 0.7, 0]} />
+      <GLTFModel url={MODELS.spikeball} position={[-10, 0, 40]} normalizedHeight={2.5} rotation={[0, 3.1, 0]} />
+      <GLTFModel url={MODELS.alien} position={[15, 0, 40]} normalizedHeight={5} rotation={[0, -1.2, 0]} />
+      <GLTFModel url={MODELS.mutant} position={[-35, 0, -20]} normalizedHeight={4.5} rotation={[0, 0.3, 0]} />
+
+      {/* ===== STRUCTURE SHOWCASE (north, -Z) ===== */}
+      <Text position={[0, 6, -20]} fontSize={0.6} color="#4488ff" anchorX="center" font={undefined}>OUTPOST</Text>
+
+      {/* Watchtower — BIG centerpiece */}
+      <GLTFModel url={MODELS.watchtower} position={[0, 0, -30]} normalizedHeight={18} rotation={[0, 0, 0]} />
+      <pointLight position={[0, 20, -30]} intensity={2} color="#ffcc44" distance={25} />
+
+      {/* Security posts flanking */}
+      <GLTFModel url={MODELS.securityPost} position={[-10, 0, -20]} normalizedHeight={6} rotation={[0, 0.3, 0]} />
+      <GLTFModel url={MODELS.securityPost} position={[10, 0, -20]} normalizedHeight={6} rotation={[0, -0.3, 0]} />
+
+      {/* Searchlights around the perimeter */}
+      <GLTFModel url={MODELS.searchlight} position={[-20, 0, -15]} normalizedHeight={5} rotation={[0, 0.8, 0]} />
+      <GLTFModel url={MODELS.searchlight} position={[20, 0, -15]} normalizedHeight={5} rotation={[0, -0.8, 0]} />
+      <GLTFModel url={MODELS.searchlight} position={[-25, 0, 10]} normalizedHeight={4} rotation={[0, 1.5, 0]} />
+      <GLTFModel url={MODELS.searchlight} position={[25, 0, 10]} normalizedHeight={4} rotation={[0, -1.5, 0]} />
+
+      {/* Cabin structures as additional buildings */}
+      <GLTFModel url={MODELS.cabin} position={[-20, 0, -30]} normalizedHeight={5} rotation={[0, 0.5, 0]} />
+      <GLTFModel url={MODELS.cabin} position={[20, 0, -30]} normalizedHeight={5} rotation={[0, -0.5, 0]} />
+
+      {/* ===== TERRAIN PROPS everywhere ===== */}
+      {/* Rocks — scattered around */}
+      {[
+        [-8, 0, 15], [20, 0, 18], [-25, 0, -5], [30, 0, -15], [-35, 0, 10],
+        [35, 0, 5], [-12, 0, -35], [18, 0, -35], [-40, 0, -10], [40, 0, -25],
+      ].map((p, i) => (
+        <GLTFModel key={`rock-${i}`} url={i % 2 === 0 ? MODELS.rock1 : MODELS.rock2}
+          position={p as [number, number, number]} normalizedHeight={1.5 + Math.sin(i * 2.3) * 1}
+          rotation={[0, i * 1.7, 0]} />
       ))}
 
-      {/* Rocks */}
-      <GLTFModel url={MODELS.rock1} position={[-12, 0, -8]} normalizedHeight={1.5} rotation={[0, 0.5, 0]} />
-      <GLTFModel url={MODELS.rock1} position={[18, 0, 14]} normalizedHeight={2.0} rotation={[0, 2.1, 0]} />
-      <GLTFModel url={MODELS.rock2} position={[-20, 0, 20]} normalizedHeight={1.8} rotation={[0, 1.2, 0]} />
-      <GLTFModel url={MODELS.rock2} position={[25, 0, -5]} normalizedHeight={1.2} rotation={[0, 3.5, 0]} />
-      <GLTFModel url={MODELS.rock1} position={[8, 0, -22]} normalizedHeight={2.5} rotation={[0, 4.2, 0]} />
-      <GLTFModel url={MODELS.rock2} position={[-25, 0, -15]} normalizedHeight={1.0} rotation={[0, 0.8, 0]} />
-
-      {/* Cliffs — map boundaries */}
-      <GLTFModel url={MODELS.cliff1} position={[-35, 0, 0]} normalizedHeight={8} rotation={[0, 0.3, 0]} />
-      <GLTFModel url={MODELS.cliff2} position={[35, 0, -10]} normalizedHeight={10} rotation={[0, 2.5, 0]} />
-      <GLTFModel url={MODELS.cliff1} position={[0, 0, -40]} normalizedHeight={7} rotation={[0, 1.8, 0]} />
-      <GLTFModel url={MODELS.cliff2} position={[-30, 0, 30]} normalizedHeight={9} rotation={[0, 4.0, 0]} />
+      {/* Cliffs — map boundaries, BIG */}
+      <GLTFModel url={MODELS.cliff1} position={[-50, 0, 0]} normalizedHeight={15} rotation={[0, 0.3, 0]} />
+      <GLTFModel url={MODELS.cliff2} position={[50, 0, -10]} normalizedHeight={18} rotation={[0, 2.5, 0]} />
+      <GLTFModel url={MODELS.cliff1} position={[0, 0, -55]} normalizedHeight={14} rotation={[0, 1.8, 0]} />
+      <GLTFModel url={MODELS.cliff2} position={[-45, 0, 40]} normalizedHeight={16} rotation={[0, 4.0, 0]} />
+      <GLTFModel url={MODELS.cliff1} position={[45, 0, 35]} normalizedHeight={12} rotation={[0, 5.5, 0]} />
+      <GLTFModel url={MODELS.cliff2} position={[0, 0, 55]} normalizedHeight={14} rotation={[0, 3.2, 0]} />
 
       {/* Trees */}
       {[
         [-8, 0, 5], [10, 0, -15], [-18, 0, 12], [22, 0, 8], [-5, 0, -25],
         [28, 0, -18], [-15, 0, -20], [12, 0, 22], [-25, 0, 5], [5, 0, 30],
         [-30, 0, -8], [30, 0, 15], [-10, 0, 28], [20, 0, -25],
+        [-40, 0, 20], [40, 0, 20], [-35, 0, -35], [35, 0, -35],
       ].map((p, i) => (
         <GLTFModel key={`tree-${i}`} url={MODELS.tree1}
-          position={p as [number, number, number]} normalizedHeight={4 + Math.sin(i * 1.7) * 2} rotation={[0, i * 1.3, 0]} />
+          position={p as [number, number, number]} normalizedHeight={5 + Math.sin(i * 1.7) * 3} rotation={[0, i * 1.3, 0]} />
       ))}
 
-      {/* Bushes */}
+      {/* Barrels — supply dumps */}
       {[
-        [-3, 0, 2], [7, 0, -8], [-14, 0, 16], [16, 0, 3], [-7, 0, -12],
-        [3, 0, 18], [-20, 0, -5], [24, 0, -14], [0, 0, -10],
+        [8, 0, -12], [9, 0, -11.5], [8.5, 0, -13], [7.5, 0, -12.5],
+        [-8, 0, -18], [-7.5, 0, -17], [-9, 0, -17.5],
       ].map((p, i) => (
-        <GLTFModel key={`bush-${i}`} url={MODELS.bush}
-          position={p as [number, number, number]} normalizedHeight={0.5 + Math.sin(i * 2.1) * 0.3} rotation={[0, i * 2.5, 0]} />
+        <GLTFModel key={`barrel-${i}`} url={MODELS.barrel}
+          position={p as [number, number, number]} normalizedHeight={1.2} rotation={[i * 0.1, i * 0.8, 0]} />
       ))}
 
-      {/* Barrels */}
-      <GLTFModel url={MODELS.barrel} position={[3, 0, -5]} normalizedHeight={0.9} />
-      <GLTFModel url={MODELS.barrel} position={[4.2, 0, -4.5]} normalizedHeight={0.9} rotation={[0, 0.8, 0]} />
-      <GLTFModel url={MODELS.barrel} position={[-15, 0, 8]} normalizedHeight={0.9} rotation={[0.3, 0, 0]} />
-
-      {/* Sandbags */}
-      <GLTFModel url={MODELS.sandbags} position={[6, 0, -3]} normalizedHeight={0.8} />
-      <GLTFModel url={MODELS.sandbags} position={[-12, 0, 15]} normalizedHeight={0.8} rotation={[0, 1.5, 0]} />
-      <GLTFModel url={MODELS.sandbags} position={[20, 0, 0]} normalizedHeight={0.8} rotation={[0, -0.7, 0]} />
-    </group>
-  );
-}
-
-// ===== Structures =====
-function Structures() {
-  return (
-    <group>
-      <GLTFModel url={MODELS.watchtower} position={[-22, 0, -25]} normalizedHeight={12} rotation={[0, 0.4, 0]} />
-      <GLTFModel url={MODELS.cabin} position={[-6, 0, 4]} normalizedHeight={4} rotation={[0, -0.3, 0]} />
-      <GLTFModel url={MODELS.securityPost} position={[15, 0, -8]} normalizedHeight={3.5} rotation={[0, 1.2, 0]} />
-      <GLTFModel url={MODELS.searchlight} position={[10, 0, 10]} normalizedHeight={3} rotation={[0, 2.0, 0]} />
-      <GLTFModel url={MODELS.searchlight} position={[-18, 0, -10]} normalizedHeight={3} rotation={[0, 0.5, 0]} />
+      {/* Sandbag bunkers */}
+      <GLTFModel url={MODELS.sandbags} position={[6, 0, -8]} normalizedHeight={1.2} />
+      <GLTFModel url={MODELS.sandbags} position={[7, 0, -7]} normalizedHeight={1.2} rotation={[0, 1.5, 0]} />
+      <GLTFModel url={MODELS.sandbags} position={[-12, 0, 15]} normalizedHeight={1.2} rotation={[0, 0.8, 0]} />
+      <GLTFModel url={MODELS.sandbags} position={[20, 0, 5]} normalizedHeight={1.2} rotation={[0, -0.7, 0]} />
     </group>
   );
 }
@@ -356,22 +431,21 @@ export default function DemoScene() {
       style={{ position: 'absolute', inset: 0 }}
       onPointerMissed={() => setTarget(null)}
     >
-      <color attach="background" args={['#080c10']} />
-      <fog attach="fog" args={['#080c10', 40, 100]} />
+      <color attach="background" args={['#060a10']} />
+      <fog attach="fog" args={['#060a10', 50, 140]} />
 
-      {/* Dramatic outdoor military lighting */}
-      <ambientLight intensity={0.2} color="#4466aa" />
+      {/* Bright outdoor lighting — showroom needs visibility */}
+      <ambientLight intensity={0.4} color="#6688cc" />
       <directionalLight
-        position={[30, 40, 20]} intensity={1.5} color="#ffeedd" castShadow
-        shadow-mapSize={[4096, 4096]} shadow-camera-far={120}
-        shadow-camera-left={-50} shadow-camera-right={50}
-        shadow-camera-top={50} shadow-camera-bottom={-50}
+        position={[40, 60, 30]} intensity={2.0} color="#ffeedd" castShadow
+        shadow-mapSize={[4096, 4096]} shadow-camera-far={150}
+        shadow-camera-left={-60} shadow-camera-right={60}
+        shadow-camera-top={60} shadow-camera-bottom={-60}
       />
-      <pointLight position={[0, 10, 0]} intensity={0.3} color="#d4af37" />
-      {/* Colored rim lights near enemy positions */}
-      <pointLight position={[12, 3, 8]} intensity={0.5} color="#ff4444" distance={15} />
-      <pointLight position={[-10, 3, 15]} intensity={0.4} color="#4488ff" distance={15} />
-      <pointLight position={[5, 3, -18]} intensity={0.6} color="#aa22aa" distance={15} />
+      {/* Fill light from opposite side */}
+      <directionalLight position={[-30, 30, -20]} intensity={0.6} color="#aabbff" />
+      {/* Overhead warm light on spawn pad */}
+      <pointLight position={[0, 15, 0]} intensity={1.5} color="#d4af37" distance={30} />
 
       {/* Environment lighting for realistic reflections */}
       <Environment preset="night" background={false} />
@@ -389,7 +463,6 @@ export default function DemoScene() {
 
       <Suspense fallback={null}>
         <Terrain />
-        <Structures />
         <PlayerCharacter />
 
         {enemies.map((e, i) => (
