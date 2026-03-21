@@ -1,10 +1,13 @@
-import { Suspense, useState } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import DemoScene from './game/scene/DemoScene';
 import GameHUD from './components/game/GameHUD';
+import MainPanel from './components/game/MainPanel';
 import { Crosshair, HitMarker, DamageFlash } from './game/scene/VFX';
 import { useGameStore } from './game/store';
+import { useSurvivalStore } from './game/survivalStore';
 import { audioManager } from './game/audio/AudioManager';
+import { getGrudgeClient } from './lib/grudge-sdk';
 
 function LoadingScreen() {
   return (
@@ -151,6 +154,35 @@ function TitleScreen({ onStart }: { onStart: () => void }) {
 export default function App() {
   const [started, setStarted] = useState(false);
   const addLog = useGameStore(s => s.addLog);
+  const initSurvival = useSurvivalStore(s => s.initSurvivalSystems);
+  const survivalTick = useSurvivalStore(s => s.survivalTick);
+  const playerPosition = useGameStore(s => s.playerPosition);
+
+  // Init survival systems on game start
+  useEffect(() => {
+    if (!started) return;
+    initSurvival();
+
+    // Auto-login as guest + start sync
+    const client = getGrudgeClient();
+    if (!client.isAuthenticated()) {
+      client.loginAsGuest().catch(() => {});
+    }
+
+    // Survival tick (runs alongside combat tick)
+    let rafId: number;
+    let lastTime = performance.now();
+    const loop = () => {
+      rafId = requestAnimationFrame(loop);
+      const now = performance.now();
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+      survivalTick(dt, useSurvivalStore.getState().nearbyNode ? useGameStore.getState().playerPosition : [0, 0, 0]);
+    };
+    rafId = requestAnimationFrame(loop);
+
+    return () => cancelAnimationFrame(rafId);
+  }, [started]);
 
   const handleStart = () => {
     // Init audio on user gesture (required by browsers)
@@ -159,8 +191,9 @@ export default function App() {
     audioManager.playUIClick();
 
     setStarted(true);
-    addLog('Welcome to GRIM ARMADA Combat Demo', 'system');
-    addLog('Click the screen to aim. WASD to move. Tab to target.', 'system');
+    addLog('Welcome to GRUDA Wars — Survival Explorer', 'system');
+    addLog('WASD move · Tab toggle Combat/Harvest · I Inventory · P Character', 'system');
+    addLog('E to harvest resources · Shift+C to craft', 'system');
   };
 
   return (
@@ -180,6 +213,7 @@ export default function App() {
               <DemoScene />
             </Suspense>
             <GameHUD />
+            <MainPanel />
             <Crosshair />
             <HitMarker />
             <DamageFlash />
