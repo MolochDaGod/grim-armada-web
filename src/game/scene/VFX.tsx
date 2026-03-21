@@ -4,6 +4,7 @@ import { Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { shakeState, hitMarkerState, damageNumbers } from './BulletSystem';
 import { useGameStore } from '../store';
+import { crosshairBloomAmount } from './WeaponSystem';
 
 // ===== Screen Shake (applied to camera) =====
 export function ScreenShake() {
@@ -52,43 +53,43 @@ export function DamageNumbers() {
   );
 }
 
-// ===== Crosshair (HTML overlay) =====
+// ===== Dynamic Crosshair with weapon bloom =====
 export function Crosshair() {
   const targetId = useGameStore(s => s.targetId);
   const hasTarget = !!targetId;
+  // crosshairBloomAmount is updated every frame by WeaponSystem
+  const spread = 16 + crosshairBloomAmount * 20;
+  const color = hasTarget ? '#ff4444' : '#ffffffaa';
+  const glow = hasTarget ? '0 0 6px #ff4444' : '0 0 3px #ffffff44';
 
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 10 }}>
-      {/* Crosshair lines */}
-      <div style={{ position: 'relative', width: 32, height: 32 }}>
+      <div style={{ position: 'relative', width: spread * 2 + 10, height: spread * 2 + 10, transition: 'width 0.08s, height 0.08s' }}>
         {/* Top */}
         <div style={{
           position: 'absolute', left: '50%', top: 0, width: 2, height: 10,
-          transform: 'translateX(-50%)', background: hasTarget ? '#ff4444' : '#ffffff88',
-          boxShadow: hasTarget ? '0 0 4px #ff4444' : 'none', transition: 'all 0.15s',
+          transform: 'translateX(-50%)', background: color, boxShadow: glow,
         }} />
         {/* Bottom */}
         <div style={{
           position: 'absolute', left: '50%', bottom: 0, width: 2, height: 10,
-          transform: 'translateX(-50%)', background: hasTarget ? '#ff4444' : '#ffffff88',
-          boxShadow: hasTarget ? '0 0 4px #ff4444' : 'none', transition: 'all 0.15s',
+          transform: 'translateX(-50%)', background: color, boxShadow: glow,
         }} />
         {/* Left */}
         <div style={{
           position: 'absolute', top: '50%', left: 0, width: 10, height: 2,
-          transform: 'translateY(-50%)', background: hasTarget ? '#ff4444' : '#ffffff88',
-          boxShadow: hasTarget ? '0 0 4px #ff4444' : 'none', transition: 'all 0.15s',
+          transform: 'translateY(-50%)', background: color, boxShadow: glow,
         }} />
         {/* Right */}
         <div style={{
           position: 'absolute', top: '50%', right: 0, width: 10, height: 2,
-          transform: 'translateY(-50%)', background: hasTarget ? '#ff4444' : '#ffffff88',
-          boxShadow: hasTarget ? '0 0 4px #ff4444' : 'none', transition: 'all 0.15s',
+          transform: 'translateY(-50%)', background: color, boxShadow: glow,
         }} />
         {/* Center dot */}
         <div style={{
           position: 'absolute', left: '50%', top: '50%', width: 3, height: 3, borderRadius: '50%',
-          transform: 'translate(-50%, -50%)', background: hasTarget ? '#ff6666' : '#ffffff66',
+          transform: 'translate(-50%, -50%)', background: hasTarget ? '#ff6666' : '#ffffff88',
+          boxShadow: hasTarget ? '0 0 4px #ff4444' : 'none',
         }} />
       </div>
     </div>

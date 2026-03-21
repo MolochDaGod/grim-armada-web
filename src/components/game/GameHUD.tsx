@@ -199,7 +199,7 @@ export default function GameHUD() {
   );
 }
 
-// ===== Input Controller — uses refs so it never re-mounts =====
+// ===== Input Controller — Fortnite-style camera-relative movement =====
 function InputController() {
   const keysRef = useRef(new Set<string>());
   const storeRef = useRef(useGameStore.getState());
@@ -226,15 +226,17 @@ function InputController() {
       }
 
       if (key === 'r') storeRef.current.resetGame();
+      // Escape exits pointer lock
+      if (key === 'escape') document.exitPointerLock();
     };
     const onUp = (e: KeyboardEvent) => keysRef.current.delete(e.key.toLowerCase());
 
     window.addEventListener('keydown', onDown);
     window.addEventListener('keyup', onUp);
     return () => { window.removeEventListener('keydown', onDown); window.removeEventListener('keyup', onUp); };
-  }, []); // empty deps — never re-mounts
+  }, []);
 
-  // Movement tick — 60fps, reads rotation from store via ref
+  // Movement tick — camera-relative: W moves forward away from camera
   useEffect(() => {
     let lastTime = performance.now();
     let rafId: number;
@@ -249,26 +251,55 @@ function InputController() {
       if (keys.size === 0) return;
 
       const s = storeRef.current;
-      const speed = 8 * dt; // 8 units/sec
-      const turnSpeed = 2.5 * dt; // rad/sec
-      const rot = s.playerRotation;
-      const sin = Math.sin(rot);
-      const cos = Math.cos(rot);
+      const isSprinting = keys.has('shift');
+      const baseSpeed = isSprinting ? 14 : 8;
+      const speed = baseSpeed * dt;
+      const turnSpeed = 2.5 * dt;
+
+      // Camera yaw defines "forward" — W moves away from camera
+      const camYaw = s.cameraYaw;
+      const fwdX = -Math.sin(camYaw);
+      const fwdZ = -Math.cos(camYaw);
+      const rightX = Math.cos(camYaw);
+      const rightZ = -Math.sin(camYaw);
 
       let dx = 0, dz = 0;
-      if (keys.has('w')) { dx -= sin * speed; dz -= cos * speed; }
-      if (keys.has('s')) { dx += sin * speed; dz += cos * speed; }
+      let isMoving = false;
+
+      // W/S — forward/backward relative to camera
+      if (keys.has('w')) { dx += fwdX * speed; dz += fwdZ * speed; isMoving = true; }
+      if (keys.has('s')) { dx -= fwdX * speed; dz -= fwdZ * speed; isMoving = true; }
+
+      // A/D — turn character (camera follows behind)
       if (keys.has('a')) s.rotatePlayer(turnSpeed);
       if (keys.has('d')) s.rotatePlayer(-turnSpeed);
-      if (keys.has('q')) { dx -= cos * speed; dz += sin * speed; }
-      if (keys.has('e')) { dx += cos * speed; dz -= sin * speed; }
 
-      if (dx !== 0 || dz !== 0) s.movePlayer(dx, dz);
+      // Q/E — strafe relative to camera
+      if (keys.has('q')) { dx -= rightX * speed; dz -= rightZ * speed; isMoving = true; }
+      if (keys.has('e')) { dx += rightX * speed; dz += rightZ * speed; isMoving = true; }
+
+      if (dx !== 0 || dz !== 0) {
+        s.movePlayer(dx, dz);
+
+        // Smoothly rotate character to face movement direction
+        if (isMoving) {
+          const targetAngle = Math.atan2(-dx, -dz);
+          let current = s.playerRotation;
+          let diff = targetAngle - current;
+          // Normalize to [-PI, PI]
+          while (diff > Math.PI) diff -= 2 * Math.PI;
+          while (diff < -Math.PI) diff += 2 * Math.PI;
+          const rotLerp = Math.min(1, 10 * dt);
+          const newRot = current + diff * rotLerp;
+          // Set absolute rotation (bypass rotatePlayer's additive behavior)
+          useGameStore.setState({ playerRotation: newRot });
+        }
+      }
     };
 
     rafId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafId);
-  }, []); // empty deps — never re-mounts
+  }, []);
 
   return null;
 }

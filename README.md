@@ -79,21 +79,63 @@ Full SWG-style type definitions:
 
 ---
 
-## Demo Scene
+## 3D Engine
 
-The Three.js demo scene includes:
+### GLB Model Pipeline
+All 19 FBX models converted to optimized GLB format:
+- **FBX → GLB conversion** via `fbx2gltf` (Facebook's converter)
+- **Mesh optimization** via `@gltf-transform` pipeline: dedup, prune, weld, quantize, meshopt reorder
+- **Original materials preserved** — no more flat-color overrides
+- **42% file size reduction** (10.4MB → 6.0MB) through vertex quantization and deduplication
+- Asset pipeline: `npm run assets:pipeline`
 
-- **Third-person camera** — Over-shoulder view, follows player rotation
-- **Terrain** — 80x80 ground plane with grid overlay, rocks, and trees
-- **Player character** — Gold capsule body + head + weapon indicator + nameplate
-- **3 Enemy NPCs:**
-  - Tusken Raider (Level 5, HP 600/400/300)
-  - Stormtrooper (Level 8, HP 800/500/350)
-  - Dark Acolyte (Level 12, HP 1200/800/600)
-- **Selection rings** — Red ring under targeted enemy
-- **3D health bars** — Color-coded (green → yellow → red)
-- **Death state** — Fallen body with transparency
-- **Stars + fog** — Atmosphere with distance fog
+**Models:** `public/models/` (enemies, player, structures, terrain, weapons)
+
+### Fortnite-Style Third-Person Camera
+- **Pointer lock** — click canvas to capture mouse
+- **Mouse orbit** — yaw + pitch control, over-the-shoulder offset
+- **Smooth follow** — framerate-independent lerp on player position
+- **Pitch clamped** — -20° to +70°
+- **Escape** to release cursor
+
+### Procedural Audio System (Howler.js + Web Audio API)
+Full audio engine with no external sound files:
+- **3-layer gunshot** — low-freq boom + noise crack + pink noise tail
+- **Spatial panning** — enemy gunfire panned by position relative to player
+- **Footsteps** — timed to movement speed, faster when sprinting
+- **Impact sounds** — different for normal hits vs crits
+- **Death sound** — frequency sweep on enemy kill
+- **Ambient drone** — low oscillator + wind noise loop
+- **Volume categories** — master/sfx/music/ambient/ui, independently adjustable
+
+**Source:** `src/game/audio/AudioManager.ts`
+
+### Spring Weapon System
+Physics-based weapon feel using custom spring interpolation:
+- **Camera sway** — weapon lags behind mouse with spring delay
+- **Movement bob** — spring-driven oscillation scaled to speed
+- **Idle breathing** — subtle weapon drift at rest
+- **Recoil kick** — impulse on fire with spring return (position + rotation)
+- **Crosshair bloom** — dynamic spread on fire, tightens over time
+
+**Source:** `src/game/scene/WeaponSystem.tsx`
+
+### Enhanced Post-Processing
+- **SSAO** — screen-space ambient occlusion for depth grounding
+- **Bloom** — tuned for muzzle flashes and lights
+- **Chromatic aberration** — subtle lens effect, increases on damage
+- **ACES filmic tone mapping** — cinematic color grading
+- **Vignette** — darkened edges for focus
+- **Environment map** — night preset for realistic reflections
+
+**Source:** `src/game/scene/PostFX.tsx`
+
+### Scene Contents
+- **19 GLB models** — player, 3 weapons, 3 enemies, 8 terrain props, 4 structures, searchlights
+- **3 Enemy NPCs** — Tusken Raider (L5), Stormtrooper (L8), Dark Acolyte (L12)
+- **Procedural terrain** — ground plane, dirt patches, 14 trees, 9 bushes, rocks, cliffs, barrels, sandbags
+- **Dynamic lighting** — directional sun, colored rim lights, point lights
+- **Stars + fog** — atmosphere with distance fog
 
 **Source:** `src/game/scene/DemoScene.tsx`
 
@@ -105,8 +147,12 @@ The Three.js demo scene includes:
 |-----|--------|
 | W | Move forward (away from camera) |
 | S | Move backward |
-| A / D | Turn left / right (camera follows) |
+| A / D | Turn character left / right |
 | Q / E | Strafe left / right |
+| Shift | Sprint |
+| Mouse | Look / aim (pointer lock) |
+| Click | Lock cursor to game |
+| Escape | Release cursor |
 | Tab | Cycle through enemy targets |
 | 1-4 | Use abilities |
 | Click enemy | Target that enemy |
@@ -174,13 +220,19 @@ GET  /api/health            — Backend health check
 
 | Layer | Technology |
 |-------|-----------|
-| Renderer | Three.js r172 via @react-three/fiber |
-| UI | React 19 + Tailwind CSS v4 |
+| Renderer | Three.js r172 (WebGL2) via @react-three/fiber 9 |
+| Models | GLB/GLTF with @gltf-transform optimization pipeline |
+| Physics | Rapier (WASM) via @react-three/rapier |
+| PostFX | SSAO, Bloom, ACES Tonemapping, Chromatic Aberration |
+| Audio | Howler.js + Web Audio API (procedural synthesis) |
+| UI | React 19 + Tailwind CSS v4 + Framer Motion |
 | State | Zustand 5 |
-| Build | Vite 6 |
+| Validation | Zod |
+| Build | Vite 6 + Gzip/Brotli compression |
 | Language | TypeScript 5.6 |
 | Hosting | Vercel |
 | Backend | Grudge Backend (grudgewarlords.com) |
+| Auth | Grudge ID (id.grudge-studio.com) |
 | Branding | Grudge Studio STYLE_GUIDE.md tokens |
 
 ---
@@ -189,26 +241,43 @@ GET  /api/health            — Backend health check
 
 ```
 grim-armada-web/
+├── scripts/
+│   ├── convert-models.mjs       # FBX → GLB batch conversion
+│   └── optimize-models.mjs      # GLB optimization (dedup, quantize, meshopt)
+├── public/models/               # 19 optimized GLB models
+│   ├── enemies/                 # alien, mutant, spikeball
+│   ├── player/                  # player character
+│   ├── structures/              # cabin, watchtower, security post, searchlight
+│   ├── terrain/                 # rocks, cliffs, trees, bushes, barrels, sandbags
+│   └── weapons/                 # assault_rifle, ak74u, smg
 ├── src/
 │   ├── game/
+│   │   ├── audio/
+│   │   │   └── AudioManager.ts  # Procedural audio system (Howler + Web Audio)
 │   │   ├── core/
 │   │   │   ├── types.ts          # All enums, interfaces, type defs
 │   │   │   └── HAMSystem.ts      # Health/Action/Mind pool system
 │   │   ├── combat/
 │   │   │   └── CombatSystem.ts   # Abilities, auto-attack, damage calc
 │   │   ├── scene/
-│   │   │   └── DemoScene.tsx     # Three.js 3D scene with camera, terrain, NPCs
-│   │   └── store.ts              # Zustand game state (player, enemies, combat log)
+│   │   │   ├── DemoScene.tsx     # Main 3D scene, camera, terrain, NPCs
+│   │   │   ├── ModelLoader.tsx   # GLTF loader with caching + original materials
+│   │   │   ├── PostFX.tsx        # SSAO, bloom, tone mapping, chromatic aberration
+│   │   │   ├── WeaponSystem.tsx  # Spring weapon sway, recoil, crosshair bloom
+│   │   │   ├── BulletSystem.tsx  # Instanced bullet trails, muzzle flash, particles
+│   │   │   ├── ProceduralAnim.ts # Procedural animation (bob, hit, death)
+│   │   │   └── VFX.tsx           # Screen shake, damage numbers, crosshair, overlays
+│   │   └── store.ts              # Zustand game state (player, enemies, camera, combat)
 │   ├── components/
 │   │   └── game/
-│   │       └── GameHUD.tsx       # HAM bars, hotbar, target frame, combat log
+│   │       └── GameHUD.tsx       # HAM bars, hotbar, target frame, combat log, input
 │   ├── lib/
 │   │   └── apiConfig.ts          # Grudge backend API client
-│   ├── App.tsx                   # Title screen + game entry
+│   ├── App.tsx                   # Framer-motion animated menu + game entry
 │   ├── main.tsx                  # React entry point
 │   └── index.css                 # Tailwind + Grudge theme tokens
 ├── vercel.json                   # Deployment config with API rewrites
-├── vite.config.ts                # Vite + Tailwind + proxy config
+├── vite.config.ts                # Vite + code-splitting + compression
 └── package.json
 ```
 
@@ -228,6 +297,13 @@ npm run build
 
 # Preview production build
 npm run preview
+
+# Asset pipeline (convert FBX → GLB, then optimize)
+npm run assets:pipeline
+
+# Individual asset steps
+npm run models:convert    # FBX → GLB via fbx2gltf
+npm run models:optimize   # Optimize GLBs (dedup, quantize, meshopt)
 ```
 
 ### Environment Variables
@@ -258,14 +334,22 @@ The `vercel.json` config:
 
 ## Roadmap
 
+- [x] GLB model pipeline (FBX → GLB conversion + optimization)
+- [x] Fortnite-style third-person camera (pointer lock, mouse orbit)
+- [x] Procedural audio system (gunshots, footsteps, ambient)
+- [x] Spring weapon system (sway, recoil, crosshair bloom)
+- [x] Enhanced post-processing (SSAO, ACES, chromatic aberration)
+- [x] Framer-motion animated UI (menus, transitions)
+- [x] Code-split build with Gzip/Brotli compression
+- [ ] Rapier physics (character controller, collisions, raycasting)
 - [ ] Character creation screen (species + profession selection)
 - [ ] Buff/debuff system UI (icons with timers above health)
 - [ ] Profession skill trees
 - [ ] Equipment/inventory integration
-- [ ] Multiplayer via Colyseus
-- [ ] Voxel character models (replacing capsule placeholders)
+- [ ] Multiplayer via Colyseus (ws.grudge-studio.com)
 - [ ] MOBA mode integration
 - [ ] Gouldstone companion system (AI clones)
+- [ ] Settings panel (graphics, audio, controls)
 
 ---
 
