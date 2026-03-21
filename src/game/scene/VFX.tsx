@@ -53,45 +53,137 @@ export function DamageNumbers() {
   );
 }
 
-// ===== Dynamic Crosshair with weapon bloom =====
+// ===== Weapon-Specific Crosshair System =====
+
+type CrosshairStyle = 'rifle' | 'pistol' | 'carbine' | 'melee' | 'harvest';
+
+function getCrosshairStyle(): CrosshairStyle {
+  // Check harvest mode first
+  try {
+    const survivalMod = (window as any).__survivalMode;
+    if (survivalMod === 'harvest') return 'harvest';
+  } catch {}
+
+  const weapon = useGameStore.getState().playerActor.weaponType;
+  switch (weapon) {
+    case 'Rifle': return 'rifle';
+    case 'Pistol': return 'pistol';
+    case 'Carbine': return 'carbine';
+    case 'OneHandMelee': case 'TwoHandMelee': case 'Polearm': case 'Unarmed': return 'melee';
+    default: return 'rifle';
+  }
+}
+
+function RifleCrosshair({ spread, color, glow, hasTarget }: { spread: number; color: string; glow: string; hasTarget: boolean }) {
+  return (
+    <div style={{ position: 'relative', width: spread * 2 + 10, height: spread * 2 + 10, transition: 'width 0.08s, height 0.08s' }}>
+      {/* Tight cross — 4 thin lines with gap */}
+      <div style={{ position: 'absolute', left: '50%', top: 0, width: 1.5, height: 10, transform: 'translateX(-50%)', background: color, boxShadow: glow }} />
+      <div style={{ position: 'absolute', left: '50%', bottom: 0, width: 1.5, height: 10, transform: 'translateX(-50%)', background: color, boxShadow: glow }} />
+      <div style={{ position: 'absolute', top: '50%', left: 0, width: 10, height: 1.5, transform: 'translateY(-50%)', background: color, boxShadow: glow }} />
+      <div style={{ position: 'absolute', top: '50%', right: 0, width: 10, height: 1.5, transform: 'translateY(-50%)', background: color, boxShadow: glow }} />
+      {/* Center dot */}
+      <div style={{ position: 'absolute', left: '50%', top: '50%', width: 2, height: 2, borderRadius: '50%', transform: 'translate(-50%, -50%)', background: hasTarget ? '#ff6666' : '#ffffff88' }} />
+    </div>
+  );
+}
+
+function PistolCrosshair({ spread, color, glow, hasTarget }: { spread: number; color: string; glow: string; hasTarget: boolean }) {
+  const size = spread * 1.6 + 16;
+  return (
+    <div style={{ position: 'relative', width: size, height: size, transition: 'width 0.08s, height 0.08s' }}>
+      {/* Circle ring */}
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: '50%',
+        border: `1.5px solid ${color}`, boxShadow: glow,
+      }} />
+      {/* Center dot — larger */}
+      <div style={{
+        position: 'absolute', left: '50%', top: '50%', width: 4, height: 4, borderRadius: '50%',
+        transform: 'translate(-50%, -50%)', background: hasTarget ? '#ff4444' : color,
+        boxShadow: hasTarget ? '0 0 6px #ff4444' : glow,
+      }} />
+    </div>
+  );
+}
+
+function CarbineCrosshair({ spread, color, glow, hasTarget }: { spread: number; color: string; glow: string; hasTarget: boolean }) {
+  const s = spread + 8;
+  return (
+    <div style={{ position: 'relative', width: s * 2, height: s * 2, transition: 'width 0.08s, height 0.08s' }}>
+      {/* Chevron top */}
+      <div style={{ position: 'absolute', left: '50%', top: 2, width: 12, height: 1.5, transform: 'translateX(-50%) rotate(0deg)', background: color, boxShadow: glow }} />
+      {/* Chevron left */}
+      <div style={{ position: 'absolute', top: '50%', left: 2, width: 1.5, height: 12, transform: 'translateY(-50%)', background: color, boxShadow: glow }} />
+      {/* Chevron right */}
+      <div style={{ position: 'absolute', top: '50%', right: 2, width: 1.5, height: 12, transform: 'translateY(-50%)', background: color, boxShadow: glow }} />
+      {/* Bottom tick */}
+      <div style={{ position: 'absolute', left: '50%', bottom: 2, width: 12, height: 1.5, transform: 'translateX(-50%)', background: color, boxShadow: glow }} />
+      {/* Center diamond */}
+      <div style={{
+        position: 'absolute', left: '50%', top: '50%', width: 5, height: 5,
+        transform: 'translate(-50%, -50%) rotate(45deg)',
+        border: `1.5px solid ${hasTarget ? '#ff4444' : color}`,
+        boxShadow: hasTarget ? '0 0 6px #ff4444' : glow,
+      }} />
+    </div>
+  );
+}
+
+function MeleeCrosshair({ hasTarget }: { hasTarget: boolean }) {
+  const color = hasTarget ? '#ff4444' : '#ffffff66';
+  return (
+    <div style={{ position: 'relative', width: 20, height: 20 }}>
+      {/* Simple center dot for melee — subtle */}
+      <div style={{
+        position: 'absolute', left: '50%', top: '50%', width: 6, height: 6, borderRadius: '50%',
+        transform: 'translate(-50%, -50%)', background: color,
+        boxShadow: hasTarget ? '0 0 8px #ff4444, 0 0 16px #ff222244' : '0 0 4px #ffffff22',
+      }} />
+      {/* Outer ring on target */}
+      {hasTarget && <div style={{
+        position: 'absolute', inset: 0, borderRadius: '50%',
+        border: '1px solid #ff444488',
+        animation: 'spin 3s linear infinite',
+      }} />}
+    </div>
+  );
+}
+
+function HarvestCrosshair() {
+  return (
+    <div style={{ position: 'relative', width: 32, height: 32 }}>
+      {/* Gather ring — gold, dashed */}
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: '50%',
+        border: '2px dashed #d4af3788',
+        boxShadow: '0 0 8px #d4af3722',
+      }} />
+      {/* Center pip */}
+      <div style={{
+        position: 'absolute', left: '50%', top: '50%', width: 4, height: 4, borderRadius: '50%',
+        transform: 'translate(-50%, -50%)', background: '#d4af37',
+        boxShadow: '0 0 4px #d4af3744',
+      }} />
+    </div>
+  );
+}
+
 export function Crosshair() {
   const targetId = useGameStore(s => s.targetId);
   const hasTarget = !!targetId;
-  // crosshairBloomAmount is updated every frame by WeaponSystem
+  const style = getCrosshairStyle();
   const spread = 16 + crosshairBloomAmount * 20;
   const color = hasTarget ? '#ff4444' : '#ffffffaa';
   const glow = hasTarget ? '0 0 6px #ff4444' : '0 0 3px #ffffff44';
 
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 10 }}>
-      <div style={{ position: 'relative', width: spread * 2 + 10, height: spread * 2 + 10, transition: 'width 0.08s, height 0.08s' }}>
-        {/* Top */}
-        <div style={{
-          position: 'absolute', left: '50%', top: 0, width: 2, height: 10,
-          transform: 'translateX(-50%)', background: color, boxShadow: glow,
-        }} />
-        {/* Bottom */}
-        <div style={{
-          position: 'absolute', left: '50%', bottom: 0, width: 2, height: 10,
-          transform: 'translateX(-50%)', background: color, boxShadow: glow,
-        }} />
-        {/* Left */}
-        <div style={{
-          position: 'absolute', top: '50%', left: 0, width: 10, height: 2,
-          transform: 'translateY(-50%)', background: color, boxShadow: glow,
-        }} />
-        {/* Right */}
-        <div style={{
-          position: 'absolute', top: '50%', right: 0, width: 10, height: 2,
-          transform: 'translateY(-50%)', background: color, boxShadow: glow,
-        }} />
-        {/* Center dot */}
-        <div style={{
-          position: 'absolute', left: '50%', top: '50%', width: 3, height: 3, borderRadius: '50%',
-          transform: 'translate(-50%, -50%)', background: hasTarget ? '#ff6666' : '#ffffff88',
-          boxShadow: hasTarget ? '0 0 4px #ff4444' : 'none',
-        }} />
-      </div>
+      {style === 'rifle' && <RifleCrosshair spread={spread} color={color} glow={glow} hasTarget={hasTarget} />}
+      {style === 'pistol' && <PistolCrosshair spread={spread} color={color} glow={glow} hasTarget={hasTarget} />}
+      {style === 'carbine' && <CarbineCrosshair spread={spread} color={color} glow={glow} hasTarget={hasTarget} />}
+      {style === 'melee' && <MeleeCrosshair hasTarget={hasTarget} />}
+      {style === 'harvest' && <HarvestCrosshair />}
     </div>
   );
 }

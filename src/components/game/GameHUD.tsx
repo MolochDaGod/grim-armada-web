@@ -2,95 +2,118 @@ import { useEffect, useRef } from 'react';
 import { useGameStore } from '../../game/store';
 import { CombatState } from '../../game/core/types';
 
-// ===== HAM Bar =====
-function HAMBar({ label, current, max, color, barBg }: {
-  label: string; current: number; max: number; color: string; barBg: string;
+// ===== Grudge Design Tokens (from grudge-guide.html) =====
+const GD = {
+  bg: '#0d0b09', bgElev: '#18130f', panel: '#1f1813', panelSoft: '#271e18',
+  line: '#4a3929', lineSoft: '#2e241b',
+  text: '#f3e6d2', muted: '#b49d81', soft: '#88725a',
+  gold: '#d6ac57', goldStrong: '#f0c978',
+  ember: '#b64f2d', green: '#6bb78a', blue: '#6d95c6', red: '#c96d63',
+};
+
+// ===== Resource Bar (grudge-guide style — rounded fill, darker track) =====
+function ResourceBar({ label, current, max, fillClass }: {
+  label: string; current: number; max: number; fillClass: string;
 }) {
   const pct = max > 0 ? (current / max) * 100 : 0;
   return (
-    <div className="mb-1">
-      <div className="flex justify-between text-xs font-semibold" style={{ fontFamily: "'Spectral SC', serif" }}>
-        <span style={{ color }}>{label}</span>
-        <span className="text-[#a39882]">{current}/{max}</span>
+    <div className="grid gap-1">
+      <div className="flex justify-between gap-2" style={{ fontSize: 12, color: GD.muted }}>
+        <span>{label}</span>
+        <strong style={{ color: GD.text, fontWeight: 700 }}>{current} / {max}</strong>
       </div>
-      <div className="h-3 rounded-sm overflow-hidden" style={{ background: barBg, border: `1px solid ${color}40` }}>
-        <div className="h-full transition-all duration-300 rounded-sm" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${color}cc, ${color})` }} />
+      <div style={{ height: 12, borderRadius: 999, background: '#100d0a', border: `1px solid ${GD.lineSoft}`, overflow: 'hidden' }}>
+        <div className={fillClass} style={{ height: '100%', borderRadius: 999, width: `${pct}%`, transition: 'width 0.3s ease' }} />
       </div>
     </div>
   );
 }
 
-// ===== Player Frame =====
+// ===== Player Frame (grudge-guide hero card style) =====
 function PlayerFrame() {
   const ham = useGameStore(s => s.ham);
   const player = useGameStore(s => s.player);
   return (
-    <div className="absolute top-4 left-4 w-64 p-3 rounded-lg" style={{
-      background: 'linear-gradient(135deg, #171d28ee, #0f1419ee)',
-      border: '1px solid #7a642040', boxShadow: '0 0 20px #d4af3710',
+    <div className="absolute top-6 left-4 w-72" style={{
+      borderRadius: 18, padding: 16,
+      background: 'radial-gradient(circle at 50% 0%, rgba(214,172,87,0.10), transparent 45%), linear-gradient(180deg, #241c16, #17120f)',
+      border: `1px solid ${GD.line}`,
+      boxShadow: '0 18px 40px rgba(0,0,0,0.38)',
     }}>
-      <div className="flex items-center gap-2 mb-2">
-        <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm" style={{ background: '#d4af3730', border: '1px solid #d4af37', color: '#d4af37' }}>
-          {player.level}
-        </div>
+      {/* Hero head */}
+      <div className="flex items-start justify-between gap-2 mb-3">
         <div>
-          <div className="text-sm font-bold" style={{ color: '#d4af37', fontFamily: "'Cinzel', serif" }}>{player.name}</div>
-          <div className="text-xs" style={{ color: '#a39882' }}>{player.species} {player.profession}</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: GD.text, fontFamily: "'Cinzel', serif" }}>{player.name}</div>
+          <div style={{ fontSize: 13, color: GD.muted, marginTop: 2 }}>Lv.{player.level} {player.species} {player.profession}</div>
         </div>
+        <div style={{
+          padding: '5px 8px', borderRadius: 999,
+          background: 'rgba(214,172,87,0.09)', border: '1px solid rgba(214,172,87,0.18)',
+          fontSize: 11, color: GD.goldStrong,
+        }}>{player.faction}</div>
       </div>
-      <HAMBar label="HEALTH" current={ham.health.current} max={ham.health.max} color="#d4af37" barBg="#1a1200" />
-      <HAMBar label="ACTION" current={ham.action.current} max={ham.action.max} color="#4a9eff" barBg="#0a1a2a" />
-      <HAMBar label="MIND" current={ham.mind.current} max={ham.mind.max} color="#b56aff" barBg="#1a0a2a" />
+      {/* Resource bars */}
+      <div className="grid gap-2.5">
+        <ResourceBar label="Health" current={ham.health.current} max={ham.health.max} fillClass="bg-health-fill" />
+        <ResourceBar label="Action" current={ham.action.current} max={ham.action.max} fillClass="bg-focus-fill" />
+        <ResourceBar label="Mind" current={ham.mind.current} max={ham.mind.max} fillClass="bg-stamina-fill" />
+      </div>
     </div>
   );
 }
 
-// ===== Target Frame =====
+// ===== Target Frame (grudge-guide style) =====
 function TargetFrame() {
   const targetId = useGameStore(s => s.targetId);
   const enemies = useGameStore(s => s.enemies);
   const target = enemies.find(e => e.actorId === targetId);
-
   if (!target) return null;
 
   return (
-    <div className="absolute top-4 left-1/2 -translate-x-1/2 w-60 p-3 rounded-lg" style={{
-      background: 'linear-gradient(135deg, #281d17ee, #1a0f09ee)',
-      border: '1px solid #a8643240', boxShadow: '0 0 15px #ff444420',
+    <div className="absolute top-6 left-1/2 -translate-x-1/2 w-64" style={{
+      borderRadius: 18, padding: 14,
+      background: 'linear-gradient(180deg, #281d17ee, #1a0f09ee)',
+      border: '1px solid rgba(201,109,99,0.18)',
+      boxShadow: '0 14px 30px rgba(0,0,0,0.3)',
     }}>
       <div className="flex items-center gap-2 mb-2">
-        <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: '#ff444430', border: '1px solid #ff4444', color: '#ff4444' }}>
-          {target.level}
+        <div style={{
+          width: 30, height: 30, borderRadius: 10,
+          background: 'linear-gradient(145deg, #51371b, #231912)',
+          border: '1px solid rgba(201,109,99,0.34)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontFamily: "'Cinzel', serif", fontSize: 13, color: GD.red,
+        }}>{target.level}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: GD.red, fontFamily: "'Cinzel', serif" }}>{target.name}</div>
         </div>
-        <div className="text-sm font-bold" style={{ color: '#ff6666', fontFamily: "'Cinzel', serif" }}>
-          {target.name}
-        </div>
-        {target.ham.isDead && <span className="text-xs text-red-500 ml-auto">DEAD</span>}
+        {target.ham.isDead && <span style={{ fontSize: 11, color: GD.red, textTransform: 'uppercase', letterSpacing: 1 }}>DEAD</span>}
       </div>
-      <HAMBar label="HP" current={target.ham.health.current} max={target.ham.health.max} color="#ef4444" barBg="#1a0808" />
-      <HAMBar label="AP" current={target.ham.action.current} max={target.ham.action.max} color="#3b82f6" barBg="#08101a" />
-      <HAMBar label="MP" current={target.ham.mind.current} max={target.ham.mind.max} color="#a855f7" barBg="#140820" />
+      <div className="grid gap-2">
+        <ResourceBar label="HP" current={target.ham.health.current} max={target.ham.health.max} fillClass="bg-health-fill" />
+        <ResourceBar label="AP" current={target.ham.action.current} max={target.ham.action.max} fillClass="bg-focus-fill" />
+        <ResourceBar label="MP" current={target.ham.mind.current} max={target.ham.mind.max} fillClass="bg-mind-fill" />
+      </div>
     </div>
   );
 }
 
-// ===== Ability Hotbar =====
+// ===== Quickbar Hotbar (grudge-guide quickbar-slot style) =====
 function AbilityHotbar() {
   const useAbility = useGameStore(s => s.useAbility);
   const combat = useGameStore(s => s.combat);
 
   const abilities = [
-    { id: 'burstShot', key: '1', icon: '🔫', name: 'Burst Shot' },
-    { id: 'headShot', key: '2', icon: '🎯', name: 'Head Shot' },
-    { id: 'powerAttack', key: '3', icon: '⚔️', name: 'Power Attack' },
-    { id: 'healDamage', key: '4', icon: '💚', name: 'Heal' },
-    null, // slot 5 empty
-    { id: 'item_food', key: '6', icon: '🍖', name: 'Food', disabled: true },
-    { id: 'item_potion', key: '7', icon: '🧪', name: 'Potion', disabled: true },
-    { id: 'item_relic', key: '8', icon: '🔮', name: 'Relic', disabled: true },
+    { id: 'burstShot', key: '1', icon: '🔫', name: 'Burst Shot', desc: 'Quick ranged burst' },
+    { id: 'headShot', key: '2', icon: '🎯', name: 'Head Shot', desc: 'Precision mind damage' },
+    { id: 'powerAttack', key: '3', icon: '⚔️', name: 'Power Attack', desc: 'Heavy melee strike' },
+    { id: 'healDamage', key: '4', icon: '💚', name: 'Heal', desc: 'Restore health' },
+    null,
+    { id: 'item_food', key: '6', icon: '🍖', name: 'Food', desc: 'Consumable', disabled: true },
+    { id: 'item_potion', key: '7', icon: '🧪', name: 'Potion', desc: 'Consumable', disabled: true },
+    { id: 'item_relic', key: '8', icon: '🔮', name: 'Relic', desc: 'On-use relic', disabled: true },
   ];
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const idx = parseInt(e.key) - 1;
@@ -104,32 +127,44 @@ function AbilityHotbar() {
   }, []);
 
   return (
-    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-1">
+    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
       {abilities.map((a, i) => {
         if (!a) return (
-          <div key={i} className="w-12 h-12 rounded border opacity-30" style={{ background: '#0f1419', borderColor: '#333' }} />
+          <div key={i} style={{
+            width: 52, height: 52, borderRadius: 14,
+            background: GD.panelSoft, border: `1px solid ${GD.lineSoft}`, opacity: 0.25,
+          }} />
         );
         const cd = combat.getCooldownRemaining('player', a.id);
         const isDisabled = 'disabled' in a && a.disabled;
+        const isReady = cd <= 0 && !isDisabled;
 
         return (
           <button key={a.id}
             onClick={() => !isDisabled && useAbility(a.id)}
-            className="w-12 h-12 rounded relative flex flex-col items-center justify-center text-lg cursor-pointer hover:brightness-125 active:scale-95 transition-all"
+            className="relative flex flex-col items-center justify-center cursor-pointer hover:brightness-125 active:scale-95"
             style={{
-              background: isDisabled ? '#1a1a1a' : cd > 0 ? '#1a1a1aaa' : 'linear-gradient(135deg, #1c2333, #283040)',
-              border: `1px solid ${isDisabled ? '#333' : cd > 0 ? '#555' : '#7a6420'}`,
-              opacity: isDisabled ? 0.4 : 1,
+              width: 52, height: 52, borderRadius: 14,
+              background: isReady
+                ? `linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.015))`
+                : GD.panelSoft,
+              border: `1px solid ${isReady ? 'rgba(214,172,87,0.24)' : GD.lineSoft}`,
+              opacity: isDisabled ? 0.35 : 1,
+              transition: '0.16s ease',
             }}
             title={`${a.name} [${a.key}]`}
           >
-            <span>{a.icon}</span>
+            <span className="text-lg">{a.icon}</span>
             {cd > 0 && (
-              <div className="absolute inset-0 flex items-center justify-center rounded" style={{ background: '#00000088' }}>
-                <span className="text-xs font-bold text-white">{cd.toFixed(1)}</span>
+              <div className="absolute inset-0 flex items-center justify-center" style={{
+                borderRadius: 14, background: 'rgba(0,0,0,0.7)',
+              }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: GD.text, fontFamily: 'JetBrains Mono, monospace' }}>
+                  {cd.toFixed(1)}
+                </span>
               </div>
             )}
-            <span className="absolute -bottom-0.5 right-0.5 text-[8px] font-bold" style={{ color: '#7a6420' }}>{a.key}</span>
+            <span className="absolute -bottom-0.5 right-1" style={{ fontSize: 9, fontWeight: 700, color: GD.soft }}>{a.key}</span>
           </button>
         );
       })}
@@ -137,7 +172,7 @@ function AbilityHotbar() {
   );
 }
 
-// ===== Combat Log =====
+// ===== Combat Log (grudge-guide feed-item style) =====
 function CombatLog() {
   const combatLog = useGameStore(s => s.combatLog);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -147,19 +182,24 @@ function CombatLog() {
   }, [combatLog.length]);
 
   const colors: Record<string, string> = {
-    damage: '#ef4444', heal: '#4ade80', miss: '#a39882', system: '#d4af37', death: '#ff6600',
+    damage: GD.red, heal: GD.green, miss: GD.soft, system: GD.gold, death: GD.ember,
   };
 
   return (
-    <div className="absolute bottom-20 left-4 w-80 h-40 rounded-lg overflow-hidden" style={{
-      background: '#0f1419cc', border: '1px solid #7a642020',
+    <div className="absolute bottom-20 left-4 w-80 h-40 overflow-hidden" style={{
+      borderRadius: 18,
+      background: 'linear-gradient(180deg, rgba(33,25,20,0.92), rgba(21,17,14,0.95))',
+      border: `1px solid rgba(214,172,87,0.12)`,
+      boxShadow: '0 14px 30px rgba(0,0,0,0.2)',
     }}>
-      <div className="px-2 py-1 text-xs font-bold" style={{ color: '#d4af37', fontFamily: "'Cinzel', serif", borderBottom: '1px solid #7a642030' }}>
-        Combat Log
-      </div>
-      <div ref={scrollRef} className="overflow-y-auto h-[calc(100%-24px)] px-2 py-1 space-y-0.5">
+      <div style={{
+        padding: '8px 12px', fontSize: 12, fontFamily: "'Cinzel', serif",
+        letterSpacing: 1.4, textTransform: 'uppercase' as const,
+        color: GD.gold, borderBottom: `1px solid rgba(214,172,87,0.12)`,
+      }}>Combat Log</div>
+      <div ref={scrollRef} className="overflow-y-auto h-[calc(100%-32px)] px-3 py-1.5 space-y-1">
         {combatLog.map(entry => (
-          <div key={entry.id} className="text-xs leading-tight" style={{ color: colors[entry.type] || '#ccc' }}>
+          <div key={entry.id} style={{ fontSize: 12, lineHeight: 1.35, color: colors[entry.type] || GD.muted }}>
             {entry.message}
           </div>
         ))}
@@ -168,19 +208,19 @@ function CombatLog() {
   );
 }
 
-// ===== Controls Help =====
+// ===== Controls Help (grudge-guide shortcut chips) =====
 function ControlsHelp() {
+  const chips = ['W/S Fwd/Back', 'A/D Turn', 'Q/E Strafe', 'Tab Target/Mode', '1-4 Skills', 'I Bag', 'P Stats'];
   return (
-    <div className="absolute top-4 right-4 p-2 rounded-lg text-xs" style={{
-      background: '#0f1419cc', border: '1px solid #7a642020', color: '#a39882',
-    }}>
-      <div className="font-bold mb-1" style={{ color: '#d4af37' }}>Controls</div>
-      <div>W/A/S/D — Move</div>
-      <div>Q/E — Strafe</div>
-      <div>Tab — Cycle targets</div>
-      <div>1-4 — Abilities</div>
-      <div>Click enemy — Target</div>
-      <div>R — Reset game</div>
+    <div className="absolute top-6 right-4 flex flex-wrap gap-1.5 max-w-48 justify-end">
+      {chips.map(c => (
+        <span key={c} style={{
+          padding: '4px 8px', borderRadius: 999,
+          border: `1px solid ${GD.line}`,
+          background: 'rgba(255,255,255,0.03)',
+          fontSize: 11, color: GD.muted, whiteSpace: 'nowrap',
+        }}>{c}</span>
+      ))}
     </div>
   );
 }

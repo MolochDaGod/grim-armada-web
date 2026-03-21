@@ -1,7 +1,9 @@
-# GRIM ARMADA — Web Combat Demo
+# GRUDA Wars — Survival Space Explorer
 
-> SWG-inspired tactical combat game built with Three.js, React, and the Grudge Backend.
-> A **Grudge Studio** production.
+> SWG-inspired survival RPG with crafting, harvesting, professions, and tactical combat.
+> Built with Three.js, React, and the Grudge Backend. A **Grudge Studio** production.
+> 
+> **Production:** [play.grudge-studio.com](https://play.grudge-studio.com)
 
 ![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?logo=vite)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)
@@ -10,15 +12,9 @@
 
 ---
 
-## Live Demo
-
-**Production:** [grim-armada-web.vercel.app](https://grim-armada-web.vercel.app)
-
----
-
 ## Game Systems
 
-All systems were ported from the original Unity C# `SWGSystems` codebase to TypeScript for browser-native execution.
+Full SWG-inspired systems ported from Unity C# to TypeScript, plus survival/crafting systems from warlord-crafting-suite.
 
 ### HAM System (Health, Action, Mind)
 
@@ -141,23 +137,44 @@ Physics-based weapon feel using custom spring interpolation:
 
 ---
 
+### Survival Systems (NEW)
+
+- **Resource Quality (300–1000):** SWG-style quality attributes (OQ, PE, SR, UT, etc.) on every resource spawn. Higher quality → better crafted items. `src/game/crafting/ResourceQuality.ts`
+- **Harvesting:** 3D interactable nodes using existing GLB models. E key → progress bar → quality loot. 5 gathering professions (Mining, Logging, Herbalism, Fishing, Skinning). `src/game/harvesting/HarvestingSystem.ts`
+- **Crafting + Experimentation:** Assembly roll + experimentation gamble. Resource quality directly determines item stats. 7 starter schematics across Blacksmithing, Woodworking, Alchemy, Enchanting. `src/game/crafting/CraftingSystem.ts`
+- **Professions:** 10 professions (5 gathering + 5 crafting), level 1–100, milestones, specializations. `src/game/professions/ProfessionManager.ts`
+- **Hero XP:** Levels 1–20, XP from combat/harvesting/crafting, 3 attribute points + 1 skill point per level. `src/game/progression/XPSystem.ts`
+- **Skill Trees:** SWG 4×4 skill box grids for Marksman, Brawler, Medic, Artisan. Prereqs, skill mods, ability unlocks. `src/game/progression/SkillTreeSystem.ts`
+- **Inventory:** 48-slot grid, equipment paper doll, quality-tracked items, stacking, drag-drop. `src/game/inventory/InventorySystem.ts`
+
+### Grudge SDK
+
+- **Auth:** Guest login, username/password, registration via `id.grudge-studio.com`
+- **Character sync:** CRUD characters, inventory, skills via `grudgewarlords.com` API
+- **Game state:** Full survival state save/load with auto-sync every 30s
+- **Services:** `src/lib/grudge-services.ts` (URL registry), `src/lib/grudge-sdk.ts` (client SDK)
+
+---
+
 ## Controls
 
 | Key | Action |
 |-----|--------|
-| W | Move forward (away from camera) |
-| S | Move backward |
-| A / D | Turn character left / right |
+| W / S | Move forward / backward (camera-relative) |
+| A / D | Turn character |
 | Q / E | Strafe left / right |
 | Shift | Sprint |
 | Mouse | Look / aim (pointer lock) |
-| Click | Lock cursor to game |
-| Escape | Release cursor |
-| Tab | Cycle through enemy targets |
+| Tab | Toggle Combat / Harvest mode |
 | 1-4 | Use abilities |
+| E | Harvest nearby resource (harvest mode) |
+| I | Toggle Inventory panel |
+| P | Toggle Character/Professions panel |
+| K | Toggle Skill Trees panel |
+| Shift+C | Toggle Crafting panel |
 | Click enemy | Target that enemy |
-| Click ground | Deselect target |
-| R | Reset game (respawn all enemies) |
+| Escape | Close panel / release cursor |
+| R | Reset game |
 
 ---
 
@@ -183,9 +200,16 @@ Physics-based weapon feel using custom spring interpolation:
 - Keeps last 50 entries
 
 ### Controls Help (top-right)
-- Quick reference overlay
+- Shortcut chips (grudge-guide style)
 
-**Source:** `src/components/game/GameHUD.tsx`
+### Main Panel (overlay)
+- Mode indicator (Combat/Harvest)
+- XP bar across top
+- Quick-access buttons (I/P/K/C)
+- Harvest progress bar, loot popups
+- Inventory, Profession, Skill Tree, Crafting panels
+
+**Source:** `src/components/game/GameHUD.tsx`, `src/components/game/MainPanel.tsx`
 
 ---
 
@@ -316,7 +340,7 @@ npm run models:optimize   # Optimize GLBs (dedup, quantize, meshopt)
 
 ## Deployment
 
-Deployed to Vercel with automatic builds from the `Three` branch.
+Deployed to Vercel. Production target: **play.grudge-studio.com**
 
 ```bash
 # Deploy preview
@@ -327,8 +351,15 @@ npx vercel --prod
 ```
 
 The `vercel.json` config:
-- Rewrites `/api/*` to `grudgewarlords.com/api/*`
+- Auth rewrites → `id.grudge-studio.com`
+- Game API rewrites → `grudgewarlords.com/api/*`
+- Immutable cache headers on hashed assets (1 year)
+- 24h cache on GLB models
+- Security headers (X-Frame-Options, nosniff, referrer)
 - SPA fallback for all other routes
+
+Domain setup (Cloudflare):
+- CNAME `play` → `cname.vercel-dns.com`
 
 ---
 
@@ -341,11 +372,20 @@ The `vercel.json` config:
 - [x] Enhanced post-processing (SSAO, ACES, chromatic aberration)
 - [x] Framer-motion animated UI (menus, transitions)
 - [x] Code-split build with Gzip/Brotli compression
-- [ ] Rapier physics (character controller, collisions, raycasting)
+- [x] SWG Resource Quality System (300-1000)
+- [x] Inventory system (48-slot grid + equipment)
+- [x] Harvesting system (3D nodes, progress bar, quality loot)
+- [x] Profession system (10 professions, XP to 100)
+- [x] Hero XP/leveling (1-20, attribute points)
+- [x] Skill tree system (SWG 4x4 grids)
+- [x] Crafting + experimentation system
+- [x] Grudge SDK (auth, character sync, auto-save)
+- [x] Weapon-specific crosshairs (rifle/pistol/carbine/melee/harvest)
+- [x] Grudge-guide design system (warm gold/ember/obsidian)
+- [x] Main game panel with keybind toggles
+- [ ] Rapier physics (character controller, collisions)
 - [ ] Character creation screen (species + profession selection)
-- [ ] Buff/debuff system UI (icons with timers above health)
-- [ ] Profession skill trees
-- [ ] Equipment/inventory integration
+- [ ] Planet exploration (space flight → landing)
 - [ ] Multiplayer via Colyseus (ws.grudge-studio.com)
 - [ ] MOBA mode integration
 - [ ] Gouldstone companion system (AI clones)
