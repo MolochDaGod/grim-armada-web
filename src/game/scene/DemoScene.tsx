@@ -32,6 +32,25 @@ const MODELS = {
   cabin: '/models/structures/cabin.glb',
   securityPost: '/models/structures/security_post.glb',
   searchlight: '/models/structures/searchlight.glb',
+  // Colony buildings (craftpix space colony pack)
+  mainHouse: '/models/colony/main_house.glb',
+  mainHouse2: '/models/colony/main_house_2lv.glb',
+  researchCenter: '/models/colony/research_center.glb',
+  farm: '/models/colony/farm.glb',
+  warehouse: '/models/colony/resource_warehouse.glb',
+  reactor: '/models/colony/reactor.glb',
+  solarPanel: '/models/colony/solar_panel.glb',
+  droneCarrier: '/models/colony/drone_carrier.glb',
+  gateway: '/models/colony/connecting_gateway.glb',
+  runway: '/models/colony/runway_strip.glb',
+  geoGenerator: '/models/colony/geothermal_generator.glb',
+  colonistHome: '/models/colony/home_colonists.glb',
+  // Battle ships (craftpix spaceship pack)
+  destroyer1: '/models/ships/destroyer_01.glb',
+  destroyer2: '/models/ships/destroyer_02.glb',
+  destroyer3: '/models/ships/destroyer_03.glb',
+  cruiser1: '/models/ships/light_cruiser_01.glb',
+  cruiser2: '/models/ships/light_cruiser_02.glb',
 };
 
 // ===== Footstep + Audio Tracker =====
@@ -344,26 +363,59 @@ function Terrain() {
       <GLTFModel url={MODELS.alien} position={[15, 0, 40]} normalizedHeight={5} rotation={[0, -1.2, 0]} />
       <GLTFModel url={MODELS.mutant} position={[-35, 0, -20]} normalizedHeight={4.5} rotation={[0, 0.3, 0]} />
 
-      {/* ===== STRUCTURE SHOWCASE (north, -Z) ===== */}
-      <Text position={[0, 6, -20]} fontSize={0.6} color="#4488ff" anchorX="center" font={undefined}>OUTPOST</Text>
+      {/* ===== SPACE COLONY BASE (north, -Z) — craftpix colony pack ===== */}
+      <Text position={[0, 8, -20]} fontSize={0.7} color="#6d95c6" anchorX="center" font={undefined}>COLONY OUTPOST</Text>
 
-      {/* Watchtower — BIG centerpiece */}
-      <GLTFModel url={MODELS.watchtower} position={[0, 0, -30]} normalizedHeight={18} rotation={[0, 0, 0]} />
-      <pointLight position={[0, 20, -30]} intensity={2} color="#ffcc44" distance={25} />
+      {/* Main House — command center, big centerpiece */}
+      <GLTFModel url={MODELS.mainHouse2} position={[0, 0, -30]} normalizedHeight={12} rotation={[0, 0, 0]} />
+      <pointLight position={[0, 14, -30]} intensity={2.5} color="#6d95c6" distance={30} />
 
-      {/* Security posts flanking */}
-      <GLTFModel url={MODELS.securityPost} position={[-10, 0, -20]} normalizedHeight={6} rotation={[0, 0.3, 0]} />
-      <GLTFModel url={MODELS.securityPost} position={[10, 0, -20]} normalizedHeight={6} rotation={[0, -0.3, 0]} />
+      {/* Research Center — crafting/skills hub */}
+      <GLTFModel url={MODELS.researchCenter} position={[-14, 0, -24]} normalizedHeight={8} rotation={[0, 0.4, 0]} />
+      <Text position={[-14, 9, -24]} fontSize={0.22} color="#6d95c6" anchorX="center" font={undefined}>Research Lab</Text>
+      <pointLight position={[-14, 10, -24]} intensity={1} color="#4488ff" distance={15} />
+
+      {/* Warehouse — storage */}
+      <GLTFModel url={MODELS.warehouse} position={[14, 0, -24]} normalizedHeight={7} rotation={[0, -0.3, 0]} />
+      <Text position={[14, 8, -24]} fontSize={0.22} color="#d6ac57" anchorX="center" font={undefined}>Warehouse</Text>
+
+      {/* Farm modules — harvesting area */}
+      <GLTFModel url={MODELS.farm} position={[-22, 0, -16]} normalizedHeight={5} rotation={[0, 0.2, 0]} />
+      <GLTFModel url={MODELS.farm} position={[-28, 0, -12]} normalizedHeight={5} rotation={[0, -0.3, 0]} />
+      <Text position={[-25, 6, -14]} fontSize={0.22} color="#6bb78a" anchorX="center" font={undefined}>Hydro Farms</Text>
+
+      {/* Reactor — power core, glowing */}
+      <GLTFModel url={MODELS.reactor} position={[22, 0, -16]} normalizedHeight={10} rotation={[0, -0.5, 0]} />
+      <pointLight position={[22, 12, -16]} intensity={2} color="#ff8844" distance={20} />
+      <Text position={[22, 11, -16]} fontSize={0.22} color="#f0c978" anchorX="center" font={undefined}>Reactor Core</Text>
+
+      {/* Solar panels — energy field */}
+      {[-18, -12, -6, 6, 12, 18].map((x, i) => (
+        <GLTFModel key={`solar-${i}`} url={MODELS.solarPanel} position={[x, 0, -40]} normalizedHeight={4} rotation={[0, 0, 0]} />
+      ))}
+
+      {/* Connecting gateways — walkways between buildings */}
+      <GLTFModel url={MODELS.gateway} position={[-7, 0, -27]} normalizedHeight={3} rotation={[0, 0, 0]} />
+      <GLTFModel url={MODELS.gateway} position={[7, 0, -27]} normalizedHeight={3} rotation={[0, Math.PI, 0]} />
+
+      {/* Landing runway */}
+      <GLTFModel url={MODELS.runway} position={[0, 0.05, -48]} normalizedHeight={3} rotation={[0, 0, 0]} />
+
+      {/* Colonist homes — residential area */}
+      <GLTFModel url={MODELS.colonistHome} position={[-30, 0, -28]} normalizedHeight={5} rotation={[0, 0.6, 0]} />
+      <GLTFModel url={MODELS.colonistHome} position={[-34, 0, -22]} normalizedHeight={5} rotation={[0, -0.2, 0]} />
+      <GLTFModel url={MODELS.mainHouse} position={[30, 0, -28]} normalizedHeight={6} rotation={[0, -0.6, 0]} />
+
+      {/* Geothermal generator */}
+      <GLTFModel url={MODELS.geoGenerator} position={[28, 0, -38]} normalizedHeight={6} rotation={[0, 1.2, 0]} />
+      <pointLight position={[28, 8, -38]} intensity={1} color="#ff6622" distance={12} />
+
+      {/* Drone carrier — parked near runway */}
+      <GLTFModel url={MODELS.droneCarrier} position={[-10, 0, -50]} normalizedHeight={5} rotation={[0, 0.3, 0]} />
 
       {/* Searchlights around the perimeter */}
       <GLTFModel url={MODELS.searchlight} position={[-20, 0, -15]} normalizedHeight={5} rotation={[0, 0.8, 0]} />
       <GLTFModel url={MODELS.searchlight} position={[20, 0, -15]} normalizedHeight={5} rotation={[0, -0.8, 0]} />
-      <GLTFModel url={MODELS.searchlight} position={[-25, 0, 10]} normalizedHeight={4} rotation={[0, 1.5, 0]} />
-      <GLTFModel url={MODELS.searchlight} position={[25, 0, 10]} normalizedHeight={4} rotation={[0, -1.5, 0]} />
-
-      {/* Cabin structures as additional buildings */}
-      <GLTFModel url={MODELS.cabin} position={[-20, 0, -30]} normalizedHeight={5} rotation={[0, 0.5, 0]} />
-      <GLTFModel url={MODELS.cabin} position={[20, 0, -30]} normalizedHeight={5} rotation={[0, -0.5, 0]} />
 
       {/* ===== TERRAIN PROPS everywhere ===== */}
       {/* Rocks — scattered around */}
@@ -413,6 +465,61 @@ function Terrain() {
   );
 }
 
+// ===== Sky Fleet — Battle ships drifting in the sky =====
+function SkyFleet() {
+  const groupRef = useRef<THREE.Group>(null);
+
+  // Slow drift animation
+  useFrame((_, dt) => {
+    if (!groupRef.current) return;
+    // Entire fleet drifts slowly across the sky
+    groupRef.current.rotation.y += dt * 0.003;
+    // Subtle bob
+    groupRef.current.position.y = 60 + Math.sin(Date.now() * 0.0003) * 2;
+  });
+
+  return (
+    <group ref={groupRef} position={[0, 60, 0]}>
+      {/* === Flagship Destroyer — huge, center-back, high === */}
+      <group position={[0, 15, -80]}>
+        <GLTFModel url={MODELS.destroyer1} normalizedHeight={30} rotation={[0, Math.PI * 0.1, 0]} />
+        <pointLight position={[0, -5, 0]} intensity={3} color="#4488ff" distance={40} />
+        <pointLight position={[0, -2, -10]} intensity={1.5} color="#ff4444" distance={20} />
+      </group>
+
+      {/* === Escort Destroyers — flanking === */}
+      <group position={[-45, 8, -50]}>
+        <GLTFModel url={MODELS.destroyer2} normalizedHeight={20} rotation={[0, 0.15, 0]} />
+        <pointLight position={[0, -3, 0]} intensity={2} color="#4488ff" distance={25} />
+      </group>
+      <group position={[45, 10, -55]}>
+        <GLTFModel url={MODELS.destroyer3} normalizedHeight={22} rotation={[0, -0.12, 0]} />
+        <pointLight position={[0, -3, 0]} intensity={2} color="#4488ff" distance={25} />
+      </group>
+
+      {/* === Light Cruisers — patrol formation, closer to player === */}
+      <group position={[-25, 0, -20]}>
+        <GLTFModel url={MODELS.cruiser1} normalizedHeight={12} rotation={[0, 0.3, 0]} />
+        <pointLight position={[0, -2, 0]} intensity={1.5} color="#66aaff" distance={15} />
+      </group>
+      <group position={[30, 2, -25]}>
+        <GLTFModel url={MODELS.cruiser2} normalizedHeight={14} rotation={[0, -0.25, 0]} />
+        <pointLight position={[0, -2, 0]} intensity={1.5} color="#66aaff" distance={15} />
+      </group>
+
+      {/* === Distant Destroyer — far background === */}
+      <group position={[70, 25, -120]}>
+        <GLTFModel url={MODELS.destroyer1} normalizedHeight={18} rotation={[0, 0.8, 0]} />
+        <pointLight position={[0, -3, 0]} intensity={1} color="#3366cc" distance={20} />
+      </group>
+      <group position={[-65, 20, -110]}>
+        <GLTFModel url={MODELS.destroyer2} normalizedHeight={16} rotation={[0, -0.5, 0]} />
+        <pointLight position={[0, -3, 0]} intensity={1} color="#3366cc" distance={20} />
+      </group>
+    </group>
+  );
+}
+
 // ===== Main Scene =====
 export default function DemoScene() {
   const enemies = useGameStore(s => s.enemies);
@@ -427,12 +534,12 @@ export default function DemoScene() {
   return (
     <Canvas
       shadows
-      camera={{ fov: 60, near: 0.1, far: 250, position: [0, 5, 10] }}
+      camera={{ fov: 60, near: 0.1, far: 500, position: [0, 5, 10] }}
       style={{ position: 'absolute', inset: 0 }}
       onPointerMissed={() => setTarget(null)}
     >
       <color attach="background" args={['#060a10']} />
-      <fog attach="fog" args={['#060a10', 50, 140]} />
+      <fog attach="fog" args={['#060a10', 60, 300]} />
 
       {/* Bright outdoor lighting — showroom needs visibility */}
       <ambientLight intensity={0.4} color="#6688cc" />
@@ -449,7 +556,10 @@ export default function DemoScene() {
 
       {/* Environment lighting for realistic reflections */}
       <Environment preset="night" background={false} />
-      <Stars radius={120} depth={60} count={3000} factor={4} fade speed={0.3} />
+      <Stars radius={120} depth={60} count={5000} factor={4} fade speed={0.3} />
+
+      {/* ===== SKY FLEET — battle ships drifting high above (craftpix ship pack) ===== */}
+      <SkyFleet />
 
       <ThirdPersonCamera />
       <GameLoop />
