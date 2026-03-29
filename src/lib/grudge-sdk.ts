@@ -47,8 +47,11 @@ export interface SurvivalGameState {
 export class GrudgeClient {
   private auth: GrudgeAuth | null = null;
   private syncTimer: ReturnType<typeof setInterval> | null = null;
+  static readonly AUTH_PAGE = 'https://id.grudge-studio.com/auth';
 
   constructor() {
+    // Consume returning token from unified auth redirect (hash fragment)
+    this.consumeAuthHash();
     // Restore auth from storage
     if (typeof localStorage !== 'undefined') {
       const token = localStorage.getItem('grudge_auth_token');
@@ -57,6 +60,36 @@ export class GrudgeClient {
         try { this.auth = JSON.parse(cached); } catch {}
       }
     }
+  }
+
+  /** Redirect to unified Grudge auth page. */
+  redirectToLogin(returnUrl?: string) {
+    const redirect = encodeURIComponent(returnUrl || window.location.href);
+    window.location.href = `${GrudgeClient.AUTH_PAGE}?redirect=${redirect}&app=grim-armada`;
+  }
+
+  /** Require auth — redirects if not logged in. */
+  requireAuth(): boolean {
+    if (this.isAuthenticated()) return true;
+    this.redirectToLogin();
+    return false;
+  }
+
+  /** Consume returning token from URL hash fragment after unified auth. */
+  private consumeAuthHash(): boolean {
+    if (typeof location === 'undefined' || !location.hash || location.hash.length < 2) return false;
+    const hash = new URLSearchParams(location.hash.slice(1));
+    const token = hash.get('token');
+    if (!token) return false;
+    this.auth = {
+      token,
+      grudgeId: hash.get('grudgeId') || '',
+      userId: hash.get('grudgeId') || '',
+      username: hash.get('name') || 'Player',
+    };
+    this.persistAuth();
+    history.replaceState(null, '', location.pathname + location.search);
+    return true;
   }
 
   // --- Auth ---
