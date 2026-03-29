@@ -127,7 +127,7 @@ function AbilityHotbar() {
   }, []);
 
   return (
-    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
+    <div className="absolute left-1/2 -translate-x-1/2 flex gap-1.5" style={{ bottom: 196 }}>
       {abilities.map((a, i) => {
         if (!a) return (
           <div key={i} style={{
@@ -186,7 +186,8 @@ function CombatLog() {
   };
 
   return (
-    <div className="absolute bottom-20 left-4 w-80 h-40 overflow-hidden" style={{
+    <div className="absolute left-4 w-80 h-40 overflow-hidden" style={{
+      bottom: 200,
       borderRadius: 18,
       background: 'linear-gradient(180deg, rgba(33,25,20,0.92), rgba(21,17,14,0.95))',
       border: `1px solid rgba(214,172,87,0.12)`,

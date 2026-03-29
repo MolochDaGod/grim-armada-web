@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import DemoScene from './game/scene/DemoScene';
 import GameHUD from './components/game/GameHUD';
 import MainPanel from './components/game/MainPanel';
+import BottomHUD from './components/game/BottomHUD';
 import { Crosshair, HitMarker, DamageFlash } from './game/scene/VFX';
 import { useGameStore } from './game/store';
 import { useSurvivalStore } from './game/survivalStore';
@@ -214,6 +215,7 @@ export default function App() {
             </Suspense>
             <GameHUD />
             <MainPanel />
+            <BottomHUD />
             <Crosshair />
             <HitMarker />
             <DamageFlash />

@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { useGameStore } from '../store';
 import { GLTFModel } from './ModelLoader';
 import { BulletRenderer } from './BulletSystem';
-import { createAnimState, updateProceduralAnim, triggerShoot, triggerHit, triggerDeath, type AnimState } from './ProceduralAnim';
+import { createAnimState, updateProceduralAnim, triggerShoot, triggerHit, triggerDeath, triggerAttack, triggerStagger, type AnimState } from './ProceduralAnim';
 import { ScreenShake, DamageNumbers } from './VFX';
 import { PostFX } from './PostFX';
 import { WeaponView } from './WeaponSystem';
@@ -70,7 +70,7 @@ function AudioTracker() {
   return null;
 }
 
-// ===== Player Character — uses MUTANT model as the actual character =====
+// ===== Player Character — proper rendering with fallback =====
 function PlayerCharacter() {
   const outerRef = useRef<THREE.Group>(null);
   const modelRef = useRef<THREE.Group>(null);
@@ -78,6 +78,23 @@ function PlayerCharacter() {
   const prevPos = useRef<[number, number, number]>([0, 0, 0]);
   const position = useGameStore(s => s.playerPosition);
   const rotation = useGameStore(s => s.playerRotation);
+  const player = useGameStore(s => s.player);
+
+  // Listen for attack results to trigger combat anims
+  useEffect(() => {
+    const unsub = useGameStore.subscribe((state, prevState) => {
+      // Check combat log for player attacks
+      if (state.combatLog.length > prevState.combatLog.length) {
+        const latest = state.combatLog[state.combatLog.length - 1];
+        if (latest.message.includes('Commander hit') || latest.message.includes('Commander healed')) {
+          triggerShoot(animRef.current);
+        } else if (latest.message.includes('hit Commander')) {
+          triggerHit(animRef.current);
+        }
+      }
+    });
+    return unsub;
+  }, []);
 
   useFrame((_, dt) => {
     const cdt = Math.min(dt, 0.05);
@@ -90,6 +107,7 @@ function PlayerCharacter() {
     const speed = Math.sqrt(dx * dx + dz * dz) / cdt;
     animRef.current.isMoving = speed > 0.5;
     animRef.current.moveSpeed = Math.min(speed / 10, 1);
+    animRef.current.isSprinting = speed > 10;
     prevPos.current = [...position];
     if (modelRef.current) updateProceduralAnim(modelRef.current, animRef.current, cdt);
   });
@@ -97,21 +115,34 @@ function PlayerCharacter() {
   return (
     <group ref={outerRef}>
       <group ref={modelRef}>
-        {/* Use the ACTUAL mutant model as the player character */}
-        <GLTFModel url={MODELS.mutant} normalizedHeight={2.0} />
+        <GLTFModel url={MODELS.player} normalizedHeight={2.0} fallbackColor="#5588cc" />
       </group>
       {/* Weapon held in right hand area */}
       <group position={[0.5, 1.0, -0.4]} rotation={[0, 0, -0.15]}>
-        <GLTFModel url={MODELS.weaponRifle} normalizedHeight={1.0} />
+        <GLTFModel url={MODELS.weaponRifle} normalizedHeight={1.0} showFallback={false} />
       </group>
+      {/* Selection glow ring */}
+      <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.8, 0.95, 32]} />
+        <meshBasicMaterial color="#d4af37" side={THREE.DoubleSide} transparent opacity={0.4} />
+      </mesh>
       <Text position={[0, 2.5, 0]} fontSize={0.22} color="#d4af37" anchorX="center" font={undefined}>
-        Commander
+        {player.name}
       </Text>
     </group>
   );
 }
 
-// ===== Enemy NPC with Real Models + Procedural Animations =====
+// ===== Enemy NPC with Real Models + Procedural Animations + Aggro AI =====
+const ENEMY_FALLBACK_COLORS: Record<string, string> = {
+  mutant: '#8844aa',
+  alien: '#44aa44',
+  spikeball: '#cc4444',
+};
+const AGGRO_RANGE = 20;
+const CHASE_SPEED = 4;
+const LEASH_RANGE = 35;
+
 function EnemyNPC({ actorId, name, color, pos, level, modelUrl }: {
   actorId: string; name: string; color: string; pos: [number, number, number]; level: number;
   modelUrl: string;
@@ -120,6 +151,8 @@ function EnemyNPC({ actorId, name, color, pos, level, modelUrl }: {
   const modelRef = useRef<THREE.Group>(null);
   const animRef = useRef<AnimState>(createAnimState());
   const wasDead = useRef(false);
+  const spawnPos = useRef<[number, number, number]>([...pos]);
+  const currentPos = useRef<[number, number, number]>([...pos]);
   const setTarget = useGameStore(s => s.setTarget);
   const targetId = useGameStore(s => s.targetId);
   const enemies = useGameStore(s => s.enemies);
@@ -127,6 +160,11 @@ function EnemyNPC({ actorId, name, color, pos, level, modelUrl }: {
   const isTargeted = targetId === actorId;
   const isDead = enemy?.ham.isDead ?? false;
   const healthPct = enemy ? enemy.ham.health.percentage : 1;
+  const actionPct = enemy ? enemy.ham.action.percentage : 1;
+
+  // Determine fallback color from model type
+  const modelType = Object.keys(ENEMY_FALLBACK_COLORS).find(k => modelUrl.includes(k)) || 'mutant';
+  const fbColor = ENEMY_FALLBACK_COLORS[modelType];
 
   useFrame((_, dt) => {
     const cdt = Math.min(dt, 0.05);
@@ -135,9 +173,59 @@ function EnemyNPC({ actorId, name, color, pos, level, modelUrl }: {
     if (isDead && !wasDead.current) { triggerDeath(animRef.current); wasDead.current = true; }
     animRef.current.isDead = isDead;
 
-    // Idle facing rotation
-    if (groupRef.current && !isDead) {
-      groupRef.current.rotation.y += 0.3 * cdt;
+    if (!isDead && groupRef.current) {
+      const playerPos = useGameStore.getState().playerPosition;
+      const dx = playerPos[0] - currentPos.current[0];
+      const dz = playerPos[2] - currentPos.current[2];
+      const distToPlayer = Math.sqrt(dx * dx + dz * dz);
+
+      // Check leash distance from spawn
+      const lx = currentPos.current[0] - spawnPos.current[0];
+      const lz = currentPos.current[2] - spawnPos.current[2];
+      const distFromSpawn = Math.sqrt(lx * lx + lz * lz);
+
+      // Aggro: chase player if within range and not leashed
+      const isAggro = (isTargeted || distToPlayer < AGGRO_RANGE) && distFromSpawn < LEASH_RANGE;
+
+      if (isAggro && distToPlayer > 3) {
+        // Chase player
+        const dir = Math.atan2(dx, dz);
+        const moveX = Math.sin(dir) * CHASE_SPEED * cdt;
+        const moveZ = Math.cos(dir) * CHASE_SPEED * cdt;
+        currentPos.current[0] += moveX;
+        currentPos.current[2] += moveZ;
+        groupRef.current.rotation.y = dir;
+        animRef.current.isMoving = true;
+        animRef.current.moveSpeed = 0.6;
+
+        // Update actor position for combat
+        if (enemy) {
+          enemy.position.x = currentPos.current[0];
+          enemy.position.z = currentPos.current[2];
+          enemy.positionVec = [...currentPos.current];
+        }
+      } else if (!isAggro && distFromSpawn > 1) {
+        // Return to spawn
+        const dir = Math.atan2(-lx, -lz);
+        const moveX = Math.sin(dir) * CHASE_SPEED * 0.5 * cdt;
+        const moveZ = Math.cos(dir) * CHASE_SPEED * 0.5 * cdt;
+        currentPos.current[0] += moveX;
+        currentPos.current[2] += moveZ;
+        groupRef.current.rotation.y = dir;
+        animRef.current.isMoving = true;
+        animRef.current.moveSpeed = 0.3;
+      } else if (isAggro && distToPlayer <= 3) {
+        // Face player in melee range
+        groupRef.current.rotation.y = Math.atan2(dx, dz);
+        animRef.current.isMoving = false;
+        animRef.current.combatStance = 1;
+      } else {
+        // Idle patrol rotation
+        groupRef.current.rotation.y += 0.3 * cdt;
+        animRef.current.isMoving = false;
+      }
+
+      groupRef.current.position.set(currentPos.current[0], currentPos.current[1], currentPos.current[2]);
     }
 
     // Apply procedural animation
@@ -150,39 +238,63 @@ function EnemyNPC({ actorId, name, color, pos, level, modelUrl }: {
       position={[pos[0], pos[1], pos[2]]}
       onClick={(e: any) => { e.stopPropagation(); if (!isDead) setTarget(actorId); }}
     >
-      {/* Selection ring */}
+      {/* Selection ring — pulsing when targeted */}
       {isTargeted && (
         <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[1.0, 1.15, 32]} />
           <meshBasicMaterial color="#ff4444" side={THREE.DoubleSide} transparent opacity={0.8} />
         </mesh>
       )}
+      {/* Aggro range indicator when not targeted but close */}
+      {!isTargeted && !isDead && (
+        <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.9, 1.0, 24]} />
+          <meshBasicMaterial color={fbColor} side={THREE.DoubleSide} transparent opacity={0.2} />
+        </mesh>
+      )}
 
-      {/* Real enemy model with procedural animation */}
+      {/* Real enemy model with procedural animation + fallback */}
       <group ref={modelRef}>
         <GLTFModel
           url={modelUrl}
           normalizedHeight={modelUrl.includes('spikeball') ? 1.2 : 2.0}
+          fallbackColor={fbColor}
         />
       </group>
 
-      {/* Health bar */}
+      {/* Health + Action bars */}
       {!isDead && (
         <group position={[0, 2.4, 0]}>
+          {/* HP bar background */}
           <mesh>
             <planeGeometry args={[1.2, 0.12]} />
             <meshBasicMaterial color="#111" transparent opacity={0.8} />
           </mesh>
+          {/* HP fill */}
           <mesh position={[(healthPct - 1) * 0.6, 0, 0.001]}>
             <planeGeometry args={[1.2 * healthPct, 0.08]} />
             <meshBasicMaterial color={healthPct > 0.5 ? '#4ade80' : healthPct > 0.25 ? '#f59e0b' : '#ef4444'} />
+          </mesh>
+          {/* Action bar (smaller, below HP) */}
+          <mesh position={[0, -0.1, 0]}>
+            <planeGeometry args={[1.2, 0.06]} />
+            <meshBasicMaterial color="#111" transparent opacity={0.6} />
+          </mesh>
+          <mesh position={[(actionPct - 1) * 0.6, -0.1, 0.001]}>
+            <planeGeometry args={[1.2 * actionPct, 0.04]} />
+            <meshBasicMaterial color="#6d95c6" />
+          </mesh>
+          {/* Level badge */}
+          <mesh position={[-0.7, 0, 0.002]}>
+            <circleGeometry args={[0.1, 8]} />
+            <meshBasicMaterial color="#d4af37" />
           </mesh>
         </group>
       )}
 
       {/* Name */}
       <Text
-        position={[0, isDead ? 0.5 : 2.7, 0]}
+        position={[0, isDead ? 0.5 : 2.75, 0]}
         fontSize={0.22}
         color={isDead ? '#666' : isTargeted ? '#ff6666' : '#ccc'}
         anchorX="center"
