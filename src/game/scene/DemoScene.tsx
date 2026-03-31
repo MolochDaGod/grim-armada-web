@@ -11,6 +11,12 @@ import { PostFX } from './PostFX';
 import { WeaponView } from './WeaponSystem';
 import { audioManager } from '../audio/AudioManager';
 
+// Dev-only perf monitor — stripped in production builds
+let Perf: React.ComponentType<any> | null = null;
+if (import.meta.env.DEV) {
+  import('r3f-perf').then(mod => { Perf = mod.Perf; }).catch(() => {});
+}
+
 // ===== Model paths (GLB) =====
 const MODELS = {
   player: '/models/player/player.glb',
@@ -683,9 +689,15 @@ export default function DemoScene() {
       {/* Enhanced post-processing stack */}
       <PostFX />
 
+      {/* Dev-only FPS / draw-call monitor (top-left) */}
+      {import.meta.env.DEV && Perf && <Perf position="bottom-left" minimal />}
+
       <Suspense fallback={null}>
         <Terrain />
         <PlayerCharacter />
+
+        {/* First-person weapon view attached to camera */}
+        <WeaponView weaponUrl={MODELS.weaponRifle} normalizedHeight={0.5} />
 
         {enemies.map((e, i) => (
           <EnemyNPC

@@ -4,6 +4,7 @@ import { Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { shakeState, hitMarkerState, damageNumbers } from './BulletSystem';
 import { useGameStore } from '../store';
+import { useSurvivalStore } from '../survivalStore';
 import { crosshairBloomAmount } from './WeaponSystem';
 
 // ===== Screen Shake (applied to camera) =====
@@ -58,11 +59,9 @@ export function DamageNumbers() {
 type CrosshairStyle = 'rifle' | 'pistol' | 'carbine' | 'melee' | 'harvest';
 
 function getCrosshairStyle(): CrosshairStyle {
-  // Check harvest mode first
-  try {
-    const survivalMod = (window as any).__survivalMode;
-    if (survivalMod === 'harvest') return 'harvest';
-  } catch {}
+  // Check harvest mode from survival store
+  const gameMode = useSurvivalStore.getState().gameMode;
+  if (gameMode === 'harvest') return 'harvest';
 
   const weapon = useGameStore.getState().playerActor.weaponType;
   switch (weapon) {
