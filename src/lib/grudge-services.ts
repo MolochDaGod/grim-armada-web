@@ -62,17 +62,10 @@ export const AUTH_API = {
 } as const;
 
 export const GAME_API = {
-  health: `${GRUDGE_API_URL}/api/health`,
-  // Character CRUD routes to canonical unified backend for uniform data
-  characters: `${GRUDGE_API_URL}/api/characters`,
-  character: (id: string) => `${GRUDGE_API_URL}/api/characters/${id}`,
-  characterMint: (id: string) => `${GRUDGE_API_URL}/api/characters/${id}/mint`,
-  // Game data (canonical race/class definitions)
-  gameDataAll: `${GRUDGE_API_URL}/api/game-data/all`,
-  gameDataRaces: `${GRUDGE_API_URL}/api/game-data/races`,
-  gameDataClasses: `${GRUDGE_API_URL}/api/game-data/classes`,
-  // Inventory/crafting/shop can stay on WCS for now
-  inventory: (charId: string) => `${GRUDGE_API_URL}/api/characters/${charId}/inventory`,
+  health: `${GRUDGE_API_URL}/health`,
+  characters: `${WCS_URL}/api/characters`,
+  character: (id: string) => `${WCS_URL}/api/characters/${id}`,
+  inventory: (charId: string) => `${WCS_URL}/api/inventory/${charId}`,
   craftedItems: (charId: string) => `${WCS_URL}/api/crafted-items/${charId}`,
   skills: (charId: string) => `${WCS_URL}/api/skills/${charId}`,
   recipes: (charId: string) => `${WCS_URL}/api/recipes/${charId}`,

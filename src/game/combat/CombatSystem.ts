@@ -193,9 +193,8 @@ export class CombatSystem {
 
   private applyResult(result: AttackResult, target: ICombatActor) {
     if (!result.hit) return;
-    // Heals are negative damageDealt → negating gives positive (heals pool)
-    // Damage is positive damageDealt → negating gives negative (drains pool)
-    target.ham.modifyPool(result.poolHit, -result.damageDealt);
+    if (result.damageDealt < 0) target.ham.modifyPool(result.poolHit, -result.damageDealt);
+    else target.ham.modifyPool(result.poolHit, -result.damageDealt);
   }
 
   private initAbilities() {

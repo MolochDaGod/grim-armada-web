@@ -383,7 +383,7 @@ export const STARTER_ITEM_DEFS: ItemDef[] = [
 
   // Basic resources (for item defs — actual instances get quality from spawns)
   { id: 'res_copper_ore', name: 'Copper Ore', description: 'Raw copper ore', category: 'resource', rarity: 'common', tier: 1, icon: '🪨', maxStack: 99, resourceTypeId: 'copper_ore', vendorPrice: 2 },
-  { id: 'res_iron_ore', name: 'Iron Ore', description: 'Raw iron ore', category: 'resource', rarity: 'common', tier: 2, icon: '🪨', maxStack: 99, resourceTypeId: 'iron_ore', vendorPrice: 5 },
+  { id: 'res_iron_ore', name: 'Iron Ore', description: 'Raw iron ore', category: 'resource', rarity: 'common', tier: 2, icon: '�ite', maxStack: 99, resourceTypeId: 'iron_ore', vendorPrice: 5 },
   { id: 'res_pine_log', name: 'Pine Log', description: 'Pine wood log', category: 'resource', rarity: 'common', tier: 1, icon: '🪵', maxStack: 99, resourceTypeId: 'pine_log', vendorPrice: 2 },
   { id: 'res_oak_log', name: 'Oak Log', description: 'Oak wood log', category: 'resource', rarity: 'common', tier: 2, icon: '🪵', maxStack: 99, resourceTypeId: 'oak_log', vendorPrice: 5 },
   { id: 'res_wild_herb', name: 'Wild Herbs', description: 'Common herbs', category: 'resource', rarity: 'common', tier: 1, icon: '🌿', maxStack: 99, resourceTypeId: 'wild_herb', vendorPrice: 1 },

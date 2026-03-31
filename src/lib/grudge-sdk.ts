@@ -197,25 +197,21 @@ export class GrudgeClient {
     return res.json();
   }
 
-  /**
-   * Create a new character via the unified backend.
-   * Backend validates race/class, computes attributes, generates avatar, mints cNFT.
-   */
-  async createCharacter(name: string, raceId: string, classId: string, manualAttributes?: Record<string, number>): Promise<GrudgeCharacter> {
+  /** Create a new character */
+  async createCharacter(name: string, profession: string, raceId?: string, classId?: string): Promise<GrudgeCharacter> {
     if (!this.auth) throw new Error('Not authenticated');
     const res = await this.authedFetch(GAME_API.characters, {
       method: 'POST',
       body: JSON.stringify({
+        userId: this.auth.userId,
         name,
+        profession,
         raceId,
         classId,
-        manualAttributes,
-        gameOrigin: 'grim-armada',
       }),
     });
     if (!res.ok) throw new Error(`Create character failed: ${res.status}`);
-    const data = await res.json();
-    return data.character || data;
+    return res.json();
   }
 
   /** Update character data (level, xp, attributes, equipment) */

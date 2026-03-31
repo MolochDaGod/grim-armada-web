@@ -211,7 +211,7 @@ function CombatLog() {
 
 // ===== Controls Help (grudge-guide shortcut chips) =====
 function ControlsHelp() {
-  const chips = ['W/S Fwd/Back', 'A/D Turn', 'Q/E Strafe', 'Tab Mode', '` Target', '1-4 Skills', 'I Bag', 'P Stats'];
+  const chips = ['W/S Fwd/Back', 'A/D Turn', 'Q/E Strafe', 'Tab Target/Mode', '1-4 Skills', 'I Bag', 'P Stats'];
   return (
     <div className="absolute top-6 right-4 flex flex-wrap gap-1.5 max-w-48 justify-end">
       {chips.map(c => (
@@ -257,9 +257,7 @@ function InputController() {
       const key = e.key.toLowerCase();
       keysRef.current.add(key);
 
-      // Tab is handled by MainPanel for mode toggle;
-      // use ~ (backtick) to cycle targets to avoid conflict
-      if (e.key === '`') {
+      if (e.key === 'Tab') {
         e.preventDefault();
         const s = storeRef.current;
         const alive = s.enemies.filter(en => !en.ham.isDead);
