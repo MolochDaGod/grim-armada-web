@@ -5,6 +5,8 @@ import {
   CombatState, Posture, WeaponType, DamageType, SkillModType, HAMType,
   type AttackResult, Species, Faction, Profession,
 } from './core/types';
+import { fireShot, triggerScreenShake, triggerHitMarker, spawnDamageNumber } from './scene/BulletSystem';
+import { audioManager } from './audio/AudioManager';
 
 // ===== NPC Definition =====
 export interface NPCActor extends ICombatActor {
@@ -48,6 +50,10 @@ interface GameStore {
   enemies: NPCActor[];
   targetId: string | null;
 
+  // Camera
+  cameraYaw: number;
+  cameraPitch: number;
+
   // UI
   combatLog: CombatLogEntry[];
   logCounter: number;
@@ -57,11 +63,15 @@ interface GameStore {
   grudgeId: string | null;
   isAuthenticated: boolean;
 
+  // Animation callback (set by scene)
+  _onAttackVisual: ((result: AttackResult) => void) | null;
+
   // Actions
   setTarget: (id: string | null) => void;
   useAbility: (abilityId: string) => void;
   movePlayer: (dx: number, dz: number) => void;
   rotatePlayer: (angle: number) => void;
+  setCameraRotation: (yaw: number, pitch: number) => void;
   addLog: (msg: string, type: CombatLogEntry['type']) => void;
   tick: (dt: number) => void;
   setGrudgeId: (id: string | null) => void;
@@ -127,11 +137,47 @@ export const useGameStore = create<GameStore>((set, get) => {
   combat.registerActor(playerActor);
   enemies.forEach(e => combat.registerActor(e));
 
-  // Wire combat log
+  // Wire combat log + visual bullet/animation callbacks
   combat.onAttackResult = (result: AttackResult) => {
     const s = get();
+    const attacker = result.attackerId === 'player' ? s.playerActor : s.enemies.find(e => e.actorId === result.attackerId);
+    const target = result.targetId === 'player' ? s.playerActor : s.enemies.find(e => e.actorId === result.targetId);
     const attName = result.attackerId === 'player' ? s.player.name : (s.enemies.find(e => e.actorId === result.attackerId)?.name ?? result.attackerId);
     const tgtName = result.targetId === 'player' ? s.player.name : (s.enemies.find(e => e.actorId === result.targetId)?.name ?? result.targetId);
+
+    // Fire visual bullet + VFX + Audio
+    if (attacker && target) {
+      const isPlayer = result.attackerId === 'player';
+      fireShot(attacker.position, target.position, isPlayer ? '#ffaa22' : '#ff4444');
+
+      // Gunshot audio (pan based on attacker position relative to player)
+      if (isPlayer) {
+        audioManager.playGunshot(0);
+      } else {
+        const playerPos = get().playerActor.position;
+        const dx = attacker.position.x - playerPos.x;
+        const pan = Math.max(-1, Math.min(1, dx * 0.1));
+        audioManager.playGunshot(pan);
+      }
+
+      if (result.hit && result.damageDealt > 0) {
+        // Hit marker + damage number + impact sound
+        if (isPlayer) triggerHitMarker(result.critical);
+        audioManager.playImpact(result.critical);
+        spawnDamageNumber(target.position, result.damageDealt, result.critical, false);
+      } else if (result.hit && result.damageDealt < 0) {
+        // Heal number
+        spawnDamageNumber(target.position, result.damageDealt, false, true);
+      }
+
+      // Screen shake when player takes damage
+      if (result.targetId === 'player' && result.hit && result.damageDealt > 0) {
+        triggerScreenShake(result.critical ? 0.25 : 0.1);
+      }
+    }
+
+    // Notify animation callbacks
+    if (s._onAttackVisual) s._onAttackVisual(result);
 
     if (!result.hit) {
       const reason = result.dodged ? 'dodged' : result.blocked ? 'blocked' : 'parried';
@@ -153,6 +199,8 @@ export const useGameStore = create<GameStore>((set, get) => {
     playerActor,
     playerPosition: [0, 0, 0],
     playerRotation: 0,
+    cameraYaw: 0,
+    cameraPitch: 0.3,
     enemies,
     targetId: null,
     combatLog: [],
@@ -160,6 +208,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     isGameRunning: true,
     grudgeId: null,
     isAuthenticated: false,
+    _onAttackVisual: null,
 
     setTarget: (id) => {
       set({ targetId: id });
@@ -197,6 +246,8 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     rotatePlayer: (angle) => set(s => ({ playerRotation: s.playerRotation + angle })),
 
+    setCameraRotation: (yaw, pitch) => set({ cameraYaw: yaw, cameraPitch: pitch }),
+
     addLog: (msg, type) => set(s => ({
       logCounter: s.logCounter + 1,
       combatLog: [...s.combatLog.slice(-50), { id: s.logCounter, time: Date.now(), message: msg, type }],
@@ -221,6 +272,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         if (e.ham.isDead && e.combatState !== CombatState.Dead) {
           e.combatState = CombatState.Dead;
           s.addLog(`${e.name} has been defeated!`, 'death');
+          audioManager.playDeath();
         }
       });
 
