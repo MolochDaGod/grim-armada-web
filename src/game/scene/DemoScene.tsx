@@ -10,6 +10,7 @@ import { ScreenShake, DamageNumbers } from './VFX';
 import { PostFX } from './PostFX';
 import { WeaponView } from './WeaponSystem';
 import { audioManager } from '../audio/AudioManager';
+import FullTerrain from '../terrain/TerrainMesh';
 
 // ===== Model paths (GLB) =====
 const MODELS = {
@@ -404,19 +405,16 @@ function Pedestal({ position, radius = 1.5, height = 0.15 }: { position: [number
 function Terrain() {
   return (
     <group>
-      {/* Large ground plane */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} receiveShadow>
-        <planeGeometry args={[200, 200, 64, 64]} />
-        <meshStandardMaterial color="#121a0e" roughness={0.95} />
-      </mesh>
+      {/* ===== NEW: VoxelSpace-inspired heightmap terrain with biome colormap ===== */}
+      <FullTerrain />
 
       {/* Landing pad — hexagonal platform where player spawns (the "ship") */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} receiveShadow>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.12, 0]} receiveShadow>
         <circleGeometry args={[8, 6]} />
         <meshStandardMaterial color="#1a1a2a" metalness={0.4} roughness={0.5} />
       </mesh>
       {/* Pad border ring */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.13, 0]}>
         <ringGeometry args={[7.8, 8.2, 6]} />
         <meshStandardMaterial color="#d4af37" emissive="#d4af37" emissiveIntensity={0.4} metalness={0.8} roughness={0.2} />
       </mesh>
