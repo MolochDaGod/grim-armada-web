@@ -41,8 +41,11 @@ export const COLYSEUS_HTTP_URL = env('VITE_COLYSEUS_HTTP_URL',
   isProduction ? 'https://ws.grudge-studio.com' : 'http://localhost:2567',
 );
 
-/** ObjectStore — sprite/asset CDN (GitHub Pages) */
-export const OBJECTSTORE_URL = env('VITE_OBJECTSTORE_URL', 'https://molochdagod.github.io/ObjectStore');
+/** ObjectStore — sprite/asset CDN (Cloudflare R2 via grudge-studio.com) */
+export const OBJECTSTORE_URL = env('VITE_OBJECTSTORE_URL', 'https://assets.grudge-studio.com');
+
+/** Game asset CDN — GLB models, textures, animations */
+export const ASSET_CDN_URL = env('VITE_ASSET_CDN_URL', 'https://assets.grudge-studio.com/grim-armada');
 
 /** Grudge Wars asset resolution API */
 export const GRUDGE_WARS_API_URL = env('VITE_GRUDGE_WARS_URL', 'https://grudgewarlords.com');

@@ -28,7 +28,7 @@ import { BulletDecals } from './BulletDecals';
 import { ExplosionSystem } from '../vfx/Explosion';
 import { MuzzleFlashSystem, triggerMuzzleFlash } from '../vfx/MuzzleFlash';
 import { GrenadeRenderer, createGrenadeFromCamera, type GrenadeData } from '../weapons/Grenade';
-import { inputManager as grenadeInput } from '../player/InputManager';
+// grenadeInput alias removed — inputManager already imported above
 
 // ===== Model paths (GLB) =====
 const MODELS = {
@@ -407,7 +407,7 @@ function EngineLoop() {
     }
 
     // Grenade throw (G key)
-    if (grenadeInput.justPressed('KeyG')) {
+    if (inputManager.justPressed('KeyG')) {
       const cam = state.camera;
       const dir = new THREE.Vector3();
       cam.getWorldDirection(dir);
