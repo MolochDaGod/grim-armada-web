@@ -24,6 +24,7 @@ import { ScenePortal } from '../scenes/ScenePortal';
 import { getWeaponConfig, isRangedWeapon } from '../weapons/WeaponConfig';
 import { UNIT_REGISTRY } from '../units/UnitRegistry';
 import { UnitCharacter } from '../units/UnitCharacter';
+import { BulletDecals } from './BulletDecals';
 
 // ===== Model paths (GLB) =====
 const MODELS = {
@@ -781,6 +782,7 @@ export default function DemoScene() {
       <ArrowRenderer />
       <ScreenShake />
       <DamageNumbers />
+      <BulletDecals />
 
       {/* Magic projectile VFX (orbs, javelins, waves) */}
       <MagicSystem />
