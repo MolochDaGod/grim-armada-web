@@ -1,0 +1,11 @@
+Model Information:
+* title:	HSI-46 - The space mining station (voxel)
+* source:	https://sketchfab.com/3d-models/hsi-46-the-space-mining-station-voxel-8c538c83458a4f6ca082deb4c1fa6a1e
+* author:	HalfBreath (https://sketchfab.com/halfbreath)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "HSI-46 - The space mining station (voxel)" (https://sketchfab.com/3d-models/hsi-46-the-space-mining-station-voxel-8c538c83458a4f6ca082deb4c1fa6a1e) by HalfBreath (https://sketchfab.com/halfbreath) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

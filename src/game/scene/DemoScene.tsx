@@ -25,6 +25,10 @@ import { getWeaponConfig, isRangedWeapon } from '../weapons/WeaponConfig';
 import { UNIT_REGISTRY } from '../units/UnitRegistry';
 import { UnitCharacter } from '../units/UnitCharacter';
 import { BulletDecals } from './BulletDecals';
+import { ExplosionSystem } from '../vfx/Explosion';
+import { MuzzleFlashSystem, triggerMuzzleFlash } from '../vfx/MuzzleFlash';
+import { GrenadeRenderer, createGrenadeFromCamera, type GrenadeData } from '../weapons/Grenade';
+import { inputManager as grenadeInput } from '../player/InputManager';
 
 // ===== Model paths (GLB) =====
 const MODELS = {
@@ -348,11 +352,10 @@ function NewCameraController() {
   return null;
 }
 
-// ===== Engine Loop — ticks weapon manager, day/night, combat systems =====
+// ===== Engine Loop — ticks weapon manager, day/night, grenades, combat systems =====
 function EngineLoop() {
   const tick = useGameStore(s => s.tick);
-  const sunRef = useRef<THREE.DirectionalLight>(null);
-  const ambientRef = useRef<THREE.AmbientLight>(null);
+  const grenadesRef = useRef<GrenadeData[]>([]);
 
   useFrame((state, dt) => {
     const cdt = Math.min(dt, 0.05);
@@ -362,7 +365,7 @@ function EngineLoop() {
     // Weapon manager tick — handles fire, reload, combo, skills, mana regen
     const weaponResult = weaponManagerTick(cdt);
 
-    // If ranged weapon fired, spawn visual bullet + audio
+    // If ranged weapon fired, spawn visual bullet + muzzle flash + audio
     if (weaponResult.fired) {
       const store = useGameStore.getState();
       const cfg = getWeaponConfig(store.weaponMode);
@@ -373,6 +376,11 @@ function EngineLoop() {
       cam.getWorldPosition(origin);
       origin.addScaledVector(dir, 1.0);
       const target = origin.clone().addScaledVector(dir, cfg.range);
+
+      // Muzzle flash at weapon muzzle position
+      if (cfg.muzzleFlash) {
+        triggerMuzzleFlash(origin.clone(), cfg.trailColor);
+      }
 
       // Spawn arrow for bow, bullet for others
       if (store.weaponMode === 'bow') {
@@ -398,12 +406,29 @@ function EngineLoop() {
       audioManager.playGunshot(0);
     }
 
+    // Grenade throw (G key)
+    if (grenadeInput.justPressed('KeyG')) {
+      const cam = state.camera;
+      const dir = new THREE.Vector3();
+      cam.getWorldDirection(dir);
+      const pos = new THREE.Vector3();
+      cam.getWorldPosition(pos);
+      grenadesRef.current.push(createGrenadeFromCamera(pos, dir));
+    }
+
     // Day/night cycle
     const newDayTime = tickDayNight(cdt);
     useGameStore.setState({ dayTime: newDayTime });
   });
 
-  return null;
+  // Grenade cleanup
+  const handleGrenadeExplode = (id: string) => {
+    grenadesRef.current = grenadesRef.current.filter(g => g.id !== id);
+  };
+
+  return (
+    <GrenadeRenderer grenades={grenadesRef.current} onExplode={handleGrenadeExplode} />
+  );
 }
 
 // ===== Arrow Renderer — renders all active arrows from store =====
@@ -482,6 +507,13 @@ function Terrain() {
 
       {/* The SHIP — cabin model scaled up as the spawn ship */}
       <GLTFModel url={MODELS.cabin} position={[0, 0.1, 0]} normalizedHeight={6} />
+
+      {/* ===== MINING STATION (wasteland biome, NE) ===== */}
+      <Suspense fallback={null}>
+        <GLTFModel url="/models/structures/mining-station/scene.gltf" position={[60, 0, 50]} normalizedHeight={20} rotation={[0, -0.5, 0]} />
+        <pointLight position={[60, 22, 50]} intensity={2} color="#ffaa44" distance={30} />
+        <Text position={[60, 22, 50]} fontSize={0.5} color="#f0c978" anchorX="center" font={undefined}>MINING STATION</Text>
+      </Suspense>
 
       {/* ===== WEAPON DISPLAY AREA (east side, +X) ===== */}
       <Text position={[15, 3, 0]} fontSize={0.6} color="#d4af37" anchorX="center" font={undefined}>ARMORY</Text>
@@ -783,6 +815,10 @@ export default function DemoScene() {
       <ScreenShake />
       <DamageNumbers />
       <BulletDecals />
+
+      {/* Explosion + muzzle flash VFX */}
+      <ExplosionSystem />
+      <MuzzleFlashSystem />
 
       {/* Magic projectile VFX (orbs, javelins, waves) */}
       <MagicSystem />
