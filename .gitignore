@@ -6,4 +6,7 @@ dist
 
 # Large FBX animation packs (serve from CDN in prod)
 public/models/animations/rifle-locomotion/*.fbx
+
+# Large GLB unit models (serve from CDN in prod)
+public/models/units/*.glb
 *.zip

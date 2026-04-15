@@ -133,6 +133,12 @@ interface GameStore {
   // Day/Night
   dayTime: number; // 0..1 (0=midnight, 0.5=noon)
 
+  // Magic projectiles
+  magicProjectiles: import('../game/weapons/MagicProjectile').MagicProjectileState[];
+
+  // Arrows
+  arrows: import('../game/weapons/Arrow').ArrowData[];
+
   // Vehicle
   isInVehicle: boolean;
   isMounted: boolean; // flying mount
@@ -189,6 +195,14 @@ interface GameStore {
 
   // Actions — Visuals
   setQuality: (q: QualityLevel) => void;
+
+  // Actions — Magic Projectiles
+  addMagicProjectile: (p: import('../game/weapons/MagicProjectile').MagicProjectileState) => void;
+  removeMagicProjectile: (id: string) => void;
+
+  // Actions — Arrows
+  addArrow: (a: import('../game/weapons/Arrow').ArrowData) => void;
+  removeArrow: (id: string) => void;
 
   // Actions — Vehicle
   setInVehicle: (v: boolean) => void;
@@ -352,6 +366,12 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     // Day/Night
     dayTime: 0.35, // morning
+
+    // Magic projectiles
+    magicProjectiles: [] as any[],
+
+    // Arrows
+    arrows: [] as any[],
 
     // Vehicle
     isInVehicle: false,
@@ -520,6 +540,14 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     // ===== Visual Settings =====
     setQuality: (q) => set({ visualSettings: { ...QUALITY_PRESETS[q] } }),
+
+    // ===== Magic Projectile Actions =====
+    addMagicProjectile: (p) => set(s => ({ magicProjectiles: [...s.magicProjectiles, p] })),
+    removeMagicProjectile: (id) => set(s => ({ magicProjectiles: s.magicProjectiles.filter(p => p.id !== id) })),
+
+    // ===== Arrow Actions =====
+    addArrow: (a) => set(s => ({ arrows: [...s.arrows, a] })),
+    removeArrow: (id) => set(s => ({ arrows: s.arrows.filter(a => a.id !== id) })),
 
     // ===== Vehicle Actions =====
     setInVehicle: (v) => set({ isInVehicle: v }),

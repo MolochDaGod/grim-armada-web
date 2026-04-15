@@ -11,6 +11,19 @@ import { PostFX } from './PostFX';
 import { WeaponView } from './WeaponSystem';
 import { audioManager } from '../audio/AudioManager';
 import FullTerrain from '../terrain/TerrainMesh';
+// ===== New Engine Systems =====
+import { inputManager } from '../player/InputManager';
+import { cameraControllerTick } from '../player/CameraController';
+import { weaponManagerTick, getCrosshairSpread } from '../weapons/WeaponManager';
+import { tickDayNight, getSunPosition, getAmbientIntensity, getSunIntensity, getFogColor } from '../survival/DayNightCycle';
+import { MagicSystem } from '../weapons/MagicProjectile';
+import { SkillEffects, type SkillEffectsHandle } from '../weapons/SkillEffects';
+import { Arrow, type ArrowData } from '../weapons/Arrow';
+import { LootChest } from '../world/LootChest';
+import { ScenePortal } from '../scenes/ScenePortal';
+import { getWeaponConfig, isRangedWeapon } from '../weapons/WeaponConfig';
+import { UNIT_REGISTRY } from '../units/UnitRegistry';
+import { UnitCharacter } from '../units/UnitCharacter';
 
 // ===== Model paths (GLB) =====
 const MODELS = {
@@ -307,88 +320,135 @@ function EnemyNPC({ actorId, name, color, pos, level, modelUrl }: {
   );
 }
 
-// ===== Fortnite-Style Third-Person Camera =====
-function ThirdPersonCamera() {
+// ===== New Camera Controller — TPS/Action/FPS + ADS zoom + recoil + shoulder swap =====
+function NewCameraController() {
   const { camera, gl } = useThree();
   const position = useGameStore(s => s.playerPosition);
-  const cameraYaw = useGameStore(s => s.cameraYaw);
-  const cameraPitch = useGameStore(s => s.cameraPitch);
-  const setCameraRotation = useGameStore(s => s.setCameraRotation);
-  const smoothPos = useRef(new THREE.Vector3());
-  const smoothCamPos = useRef(new THREE.Vector3());
-  const isLocked = useRef(false);
 
-  // Pointer lock on click
+  // Init InputManager + pointer lock on first mount
   useEffect(() => {
+    inputManager.init();
     const canvas = gl.domElement;
     const onClick = () => {
-      if (!isLocked.current) canvas.requestPointerLock();
-    };
-    const onLockChange = () => {
-      isLocked.current = document.pointerLockElement === canvas;
-    };
-    const onMouseMove = (e: MouseEvent) => {
-      if (!isLocked.current) return;
-      const sensitivity = 0.002;
-      const newYaw = cameraYawRef.current - e.movementX * sensitivity;
-      const newPitch = Math.max(-0.35, Math.min(1.2, cameraPitchRef.current + e.movementY * sensitivity));
-      cameraYawRef.current = newYaw;
-      cameraPitchRef.current = newPitch;
-      setCameraRotation(newYaw, newPitch);
+      if (!inputManager.isPointerLocked) canvas.requestPointerLock();
     };
     canvas.addEventListener('click', onClick);
-    document.addEventListener('pointerlockchange', onLockChange);
-    document.addEventListener('mousemove', onMouseMove);
     return () => {
       canvas.removeEventListener('click', onClick);
-      document.removeEventListener('pointerlockchange', onLockChange);
-      document.removeEventListener('mousemove', onMouseMove);
     };
-  }, [gl, setCameraRotation]);
-
-  // Refs to avoid stale closure in mousemove
-  const cameraYawRef = useRef(cameraYaw);
-  const cameraPitchRef = useRef(cameraPitch);
-  useEffect(() => { cameraYawRef.current = cameraYaw; }, [cameraYaw]);
-  useEffect(() => { cameraPitchRef.current = cameraPitch; }, [cameraPitch]);
+  }, [gl]);
 
   useFrame((_, dt) => {
-    const lerpFactor = 1 - Math.pow(0.001, dt); // ~smooth at any framerate
-
-    // Smooth follow player position
-    smoothPos.current.lerp(
-      new THREE.Vector3(position[0], position[1], position[2]),
-      lerpFactor,
-    );
-
-    // Over-the-shoulder offset in spherical coords
-    const distance = 5.0;
-    const shoulderX = 1.0;
-    const heightOffset = 2.0;
-
-    const camX = smoothPos.current.x + Math.sin(cameraYaw) * Math.cos(cameraPitch) * distance + Math.cos(cameraYaw) * shoulderX;
-    const camY = smoothPos.current.y + heightOffset + Math.sin(cameraPitch) * distance;
-    const camZ = smoothPos.current.z + Math.cos(cameraYaw) * Math.cos(cameraPitch) * distance - Math.sin(cameraYaw) * shoulderX;
-
-    const targetCamPos = new THREE.Vector3(camX, camY, camZ);
-    smoothCamPos.current.lerp(targetCamPos, lerpFactor);
-
-    camera.position.copy(smoothCamPos.current);
-    camera.lookAt(
-      smoothPos.current.x,
-      smoothPos.current.y + 1.4,
-      smoothPos.current.z,
-    );
+    const cdt = Math.min(dt, 0.05);
+    cameraControllerTick(cdt, camera as THREE.PerspectiveCamera, position);
+    inputManager.resetFrame();
   });
 
   return null;
 }
 
-// ===== Game Loop =====
-function GameLoop() {
+// ===== Engine Loop — ticks weapon manager, day/night, combat systems =====
+function EngineLoop() {
   const tick = useGameStore(s => s.tick);
-  useFrame((_, dt) => { tick(Math.min(dt, 0.1)); });
+  const sunRef = useRef<THREE.DirectionalLight>(null);
+  const ambientRef = useRef<THREE.AmbientLight>(null);
+
+  useFrame((state, dt) => {
+    const cdt = Math.min(dt, 0.05);
+    // Legacy combat tick
+    tick(cdt);
+
+    // Weapon manager tick — handles fire, reload, combo, skills, mana regen
+    const weaponResult = weaponManagerTick(cdt);
+
+    // If ranged weapon fired, spawn visual bullet + audio
+    if (weaponResult.fired) {
+      const store = useGameStore.getState();
+      const cfg = getWeaponConfig(store.weaponMode);
+      const cam = state.camera;
+      const dir = new THREE.Vector3();
+      cam.getWorldDirection(dir);
+      const origin = new THREE.Vector3();
+      cam.getWorldPosition(origin);
+      origin.addScaledVector(dir, 1.0);
+      const target = origin.clone().addScaledVector(dir, cfg.range);
+
+      // Spawn arrow for bow, bullet for others
+      if (store.weaponMode === 'bow') {
+        const arrow: ArrowData = {
+          id: `arrow-${Date.now()}-${Math.random()}`,
+          position: origin.clone(),
+          direction: dir.clone(),
+          speed: cfg.projectileSpeed,
+          gravity: cfg.projectileGravity,
+          lifetime: cfg.projectileLifetime,
+          trailColor: cfg.trailColor,
+        };
+        store.addArrow(arrow);
+      } else {
+        // Use existing bullet system with weapon-specific colors
+        const { fireShot } = require('./BulletSystem');
+        fireShot(
+          { x: origin.x, y: origin.y, z: origin.z },
+          { x: target.x, y: target.y, z: target.z },
+          cfg.trailColor,
+        );
+      }
+      audioManager.playGunshot(0);
+    }
+
+    // Day/night cycle
+    const newDayTime = tickDayNight(cdt);
+    useGameStore.setState({ dayTime: newDayTime });
+  });
+
   return null;
+}
+
+// ===== Arrow Renderer — renders all active arrows from store =====
+function ArrowRenderer() {
+  const arrows = useGameStore(s => s.arrows);
+  const removeArrow = useGameStore(s => s.removeArrow);
+  return (
+    <>
+      {arrows.map(a => (
+        <Arrow key={a.id} data={a} onExpire={removeArrow} />
+      ))}
+    </>
+  );
+}
+
+// ===== Dynamic Lighting — sun position/intensity from day/night cycle =====
+function DynamicLighting() {
+  const sunRef = useRef<THREE.DirectionalLight>(null);
+  const ambientRef = useRef<THREE.AmbientLight>(null);
+
+  useFrame(() => {
+    const dayTime = useGameStore.getState().dayTime;
+    const sunPos = getSunPosition(dayTime);
+    if (sunRef.current) {
+      sunRef.current.position.set(sunPos[0], sunPos[1], sunPos[2]);
+      sunRef.current.intensity = getSunIntensity(dayTime);
+    }
+    if (ambientRef.current) {
+      ambientRef.current.intensity = getAmbientIntensity(dayTime);
+    }
+  });
+
+  return (
+    <>
+      <ambientLight ref={ambientRef} intensity={0.4} color="#6688cc" />
+      <directionalLight
+        ref={sunRef}
+        position={[40, 60, 30]} intensity={2.0} color="#ffeedd" castShadow
+        shadow-mapSize={[4096, 4096]} shadow-camera-far={150}
+        shadow-camera-left={-60} shadow-camera-right={60}
+        shadow-camera-top={60} shadow-camera-bottom={-60}
+      />
+      <directionalLight position={[-30, 30, -20]} intensity={0.6} color="#aabbff" />
+      <pointLight position={[0, 15, 0]} intensity={1.5} color="#d4af37" distance={30} />
+    </>
+  );
 }
 
 // ===== Display pedestal for showroom models =====
@@ -630,10 +690,62 @@ function SkyFleet() {
   );
 }
 
+// ===== Loot Chest Placements =====
+function WorldLoot() {
+  return (
+    <>
+      <LootChest position={[8, 0.25, -12]} goldAmount={15} />
+      <LootChest position={[-20, 0.25, 10]} goldAmount={25} />
+      <LootChest position={[30, 0.25, -25]} goldAmount={40} />
+      <LootChest position={[-35, 0.25, -15]} goldAmount={20} />
+      <LootChest position={[25, 0.25, 30]} goldAmount={30} />
+      <LootChest position={[-10, 0.25, -40]} goldAmount={50} />
+    </>
+  );
+}
+
+// ===== Scene Portals at biome borders =====
+function WorldPortals() {
+  return (
+    <>
+      <ScenePortal position={[70, 0, 70]} targetScene="wasteland" />
+      <ScenePortal position={[0, 0, -70]} targetScene="dungeon" />
+      <ScenePortal position={[-70, 0, 0]} targetScene="forge" />
+    </>
+  );
+}
+
+// ===== Unit Showcase — the 3 hero characters on display =====
+function UnitShowcase() {
+  return (
+    <group>
+      <Text position={[0, 3.5, 18]} fontSize={0.6} color="#d4af37" anchorX="center" font={undefined}>HEROES</Text>
+      {UNIT_REGISTRY.map((unit, i) => {
+        const spacing = 5;
+        const x = (i - (UNIT_REGISTRY.length - 1) / 2) * spacing;
+        return (
+          <Suspense key={unit.id} fallback={null}>
+            <UnitCharacter
+              def={unit}
+              position={[x, 0, 20]}
+              rotation={Math.PI}
+              height={2.2}
+              selected
+            />
+            <Pedestal position={[x, 0, 20]} radius={1.2} />
+            <pointLight position={[x, 4, 20]} intensity={1.2} color={unit.color} distance={8} />
+          </Suspense>
+        );
+      })}
+    </group>
+  );
+}
+
 // ===== Main Scene =====
 export default function DemoScene() {
   const enemies = useGameStore(s => s.enemies);
   const setTarget = useGameStore(s => s.setTarget);
+  const skillEffectsRef = useRef<SkillEffectsHandle>(null!);
 
   const enemyModels = [
     MODELS.mutant,
@@ -644,39 +756,37 @@ export default function DemoScene() {
   return (
     <Canvas
       shadows
-      camera={{ fov: 60, near: 0.1, far: 500, position: [0, 5, 10] }}
+      camera={{ fov: 70, near: 0.1, far: 500, position: [0, 5, 10] }}
       style={{ position: 'absolute', inset: 0 }}
       onPointerMissed={() => setTarget(null)}
     >
       <color attach="background" args={['#060a10']} />
       <fog attach="fog" args={['#060a10', 60, 300]} />
 
-      {/* Bright outdoor lighting — showroom needs visibility */}
-      <ambientLight intensity={0.4} color="#6688cc" />
-      <directionalLight
-        position={[40, 60, 30]} intensity={2.0} color="#ffeedd" castShadow
-        shadow-mapSize={[4096, 4096]} shadow-camera-far={150}
-        shadow-camera-left={-60} shadow-camera-right={60}
-        shadow-camera-top={60} shadow-camera-bottom={-60}
-      />
-      {/* Fill light from opposite side */}
-      <directionalLight position={[-30, 30, -20]} intensity={0.6} color="#aabbff" />
-      {/* Overhead warm light on spawn pad */}
-      <pointLight position={[0, 15, 0]} intensity={1.5} color="#d4af37" distance={30} />
+      {/* Dynamic lighting — driven by day/night cycle */}
+      <DynamicLighting />
 
       {/* Environment lighting for realistic reflections */}
       <Environment preset="night" background={false} />
       <Stars radius={120} depth={60} count={5000} factor={4} fade speed={0.3} />
 
-      {/* ===== SKY FLEET — battle ships drifting high above (craftpix ship pack) ===== */}
+      {/* ===== SKY FLEET ===== */}
       <SkyFleet />
 
-      <ThirdPersonCamera />
-      <GameLoop />
+      {/* ===== NEW ENGINE SYSTEMS ===== */}
+      <NewCameraController />
+      <EngineLoop />
       <AudioTracker />
       <BulletRenderer />
+      <ArrowRenderer />
       <ScreenShake />
       <DamageNumbers />
+
+      {/* Magic projectile VFX (orbs, javelins, waves) */}
+      <MagicSystem />
+
+      {/* Skill ground-plane VFX (rings, bursts, sparks) */}
+      <SkillEffects ref={skillEffectsRef} />
 
       {/* Enhanced post-processing stack */}
       <PostFX />
@@ -684,6 +794,15 @@ export default function DemoScene() {
       <Suspense fallback={null}>
         <Terrain />
         <PlayerCharacter />
+
+        {/* Loot chests scattered across the world */}
+        <WorldLoot />
+
+        {/* Scene portals at biome borders */}
+        <WorldPortals />
+
+        {/* Hero unit showcase */}
+        <UnitShowcase />
 
         {enemies.map((e, i) => (
           <EnemyNPC

@@ -1,6 +1,10 @@
 /**
  * CameraController — TPS/Action/FPS camera with ADS zoom.
- * Ported from Motion useGameStore CameraSettings + Unity TPS PlayerAim.cs.
+ * Ported from Motion CameraSettings + Unity TPS PlayerAim.cs.
+ * Enhanced with CopperCube behavior_ThirdPersonCamera patterns:
+ *   - Smooth base-height tracking (prevents Y jitter on terrain bumps)
+ *   - Camera reset key (R) snaps yaw behind player facing
+ *   - Focus point uses smoothed height, not raw player Y
  *
  * Call `cameraControllerTick(dt, camera, playerPos)` each frame inside useFrame.
  */
@@ -9,6 +13,7 @@ import * as THREE from 'three';
 import { useGameStore } from '../store';
 import { inputManager } from './InputManager';
 import { getRecoil } from '../weapons/WeaponManager';
+import { getFacingAngle } from './CharacterController';
 
 // ── Camera presets per view mode ──────────────────────────────────────────────
 const PRESETS = {
@@ -21,6 +26,14 @@ const ADS_FOV = 50;
 const ADS_DISTANCE = 2.5;
 const ADS_SHOULDER_X = 0.3;
 const ADS_LERP_SPEED = 8;
+
+// ── Smooth height tracking (from CopperCube behavior_ThirdPersonCamera) ───────
+// Instead of following raw player Y directly, we slowly lerp a "base height"
+// toward the player's actual Y. This prevents camera jitter when walking
+// over small terrain bumps, steps, or slopes.
+const HEIGHT_SMOOTH_FACTOR = 0.05; // low = very smooth, high = snappy
+let _baseHeight = 0;
+let _baseHeightInit = false;
 
 // ── Internal state ────────────────────────────────────────────────────────────
 let _yaw = 0;
@@ -62,6 +75,19 @@ export function cameraControllerTick(
   _yaw += recoil.yaw;
   _pitch += recoil.pitch;
 
+  // ── Camera reset key (R) — from CopperCube behavior_ThirdPersonCamera ────
+  // Snaps the camera yaw to directly behind the player's facing direction.
+  // Useful after spinning the camera freely to quickly re-center behind char.
+  if (input.justPressed('KeyR') && !store.isReloading) {
+    _yaw = getFacingAngle() + Math.PI;
+  }
+
+  // ── Scroll wheel zoom (distance adjust) ───────────────────────────────────
+  if (input.mouse.wheel !== 0 && camSettings.mode !== 'fps') {
+    const zoomDelta = input.mouse.wheel > 0 ? 0.5 : -0.5;
+    _currentDist = Math.max(1.5, Math.min(12.0, _currentDist + zoomDelta));
+  }
+
   // ── Camera shake decay ───────────────────────────────────────────────────
   _shakeDecay = Math.max(0, store.cameraShakeIntensity - dt * 3);
   store.setCameraShake(_shakeDecay);
@@ -86,8 +112,17 @@ export function cameraControllerTick(
   _currentShX = THREE.MathUtils.lerp(_currentShX, targetShX, lerpT);
   _currentShY = THREE.MathUtils.lerp(_currentShY, preset.shoulderY, lerpT);
 
-  // ── Smooth follow player ─────────────────────────────────────────────────
-  const targetPlayerPos = new THREE.Vector3(playerPos[0], playerPos[1], playerPos[2]);
+  // ── Smooth base-height tracking (from CopperCube) ─────────────────────────
+  // Slowly lerp _baseHeight toward the player's actual Y. This creates a
+  // stable vertical reference point so the camera doesn't bounce on terrain.
+  if (!_baseHeightInit) {
+    _baseHeight = playerPos[1];
+    _baseHeightInit = true;
+  }
+  _baseHeight += (playerPos[1] - _baseHeight) * HEIGHT_SMOOTH_FACTOR;
+
+  // ── Smooth follow player (XZ from raw pos, Y from smoothed baseHeight) ────
+  const targetPlayerPos = new THREE.Vector3(playerPos[0], _baseHeight, playerPos[2]);
   _smoothPlayerPos.lerp(targetPlayerPos, 1 - Math.pow(0.001, dt));
 
   // ── Compute camera position (spherical offset from player) ────────────────
@@ -105,7 +140,11 @@ export function cameraControllerTick(
 
   // ── Apply ────────────────────────────────────────────────────────────────
   camera.position.copy(_smoothCamPos);
-  camera.lookAt(_smoothPlayerPos.x, _smoothPlayerPos.y + _currentShY * 0.7, _smoothPlayerPos.z);
+  // Focus point uses smoothed baseHeight + shoulderY (CopperCube pattern:
+  // focusY = baseHeight + Height — the camera looks at a vertically
+  // stable point, never bouncing with raw terrain Y)
+  const focusY = _baseHeight + _currentShY * 0.7;
+  camera.lookAt(_smoothPlayerPos.x, focusY, _smoothPlayerPos.z);
   camera.fov = _currentFov;
   camera.updateProjectionMatrix();
 
@@ -121,6 +160,8 @@ export function resetCameraController() {
   _currentShX = 0.52;
   _currentShY = 1.30;
   _shakeDecay = 0;
+  _baseHeight = 0;
+  _baseHeightInit = false;
   _smoothPlayerPos.set(0, 0, 0);
   _smoothCamPos.set(0, 5, 10);
 }
