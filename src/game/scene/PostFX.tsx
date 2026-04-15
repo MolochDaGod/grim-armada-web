@@ -22,7 +22,7 @@ export function PostFX() {
   });
 
   return (
-    <EffectComposer multisampling={4}>
+    <EffectComposer multisampling={4} enableNormalPass>
       {/* SSAO — adds depth and grounding to the scene */}
       <SSAO
         samples={16}

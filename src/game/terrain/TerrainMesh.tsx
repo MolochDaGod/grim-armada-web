@@ -163,24 +163,29 @@ const SPLAT_FRAGMENT = /* glsl */`
 
 export function TerrainMesh() {
   const meshRef = useRef<THREE.Mesh>(null);
+  const geoRef = useRef<THREE.PlaneGeometry | null>(null);
+  const cmapRef = useRef<THREE.CanvasTexture | null>(null);
+  const [ready, setReady] = useState(false);
   const [material, setMaterial] = useState<THREE.ShaderMaterial | null>(null);
 
-  // Generate terrain data and textures once
-  const { geometry, colormap, terrain } = useMemo(() => {
-    const t = getTerrainData();
-    const geo = new THREE.PlaneGeometry(
-      TERRAIN_SIZE, TERRAIN_SIZE,
-      TERRAIN_SEGMENTS, TERRAIN_SEGMENTS,
-    );
-    applyHeightmapToGeometry(geo, t);
-    const cmap = generateColormap(t);
-    return { geometry: geo, colormap: cmap, terrain: t };
-  }, []);
-
-  // Load tileable textures and create splatmap shader
+  // Generate terrain data imperatively (avoid returning Three.js objects from useMemo
+  // which causes circular JSON serialization crash in R3F reconciler)
   useEffect(() => {
+    const t = getTerrainData();
+
+    // Use 128 segments instead of 256 to prevent WebGL context loss (16K vs 66K vertices)
+    const SEGMENTS = 128;
+    const geo = new THREE.PlaneGeometry(TERRAIN_SIZE, TERRAIN_SIZE, SEGMENTS, SEGMENTS);
+    applyHeightmapToGeometry(geo, t);
+    geoRef.current = geo;
+
+    const cmap = generateColormap(t);
+    cmapRef.current = cmap;
+    setReady(true);
+
+    // Load tileable textures and create splatmap shader
     const loader = new THREE.TextureLoader();
-    const loadTex = (path: string, repeat = 40): Promise<THREE.Texture> =>
+    const loadTex = (path: string): Promise<THREE.Texture> =>
       new Promise((resolve) => {
         loader.load(path, (tex) => {
           tex.wrapS = THREE.RepeatWrapping;
@@ -190,7 +195,6 @@ export function TerrainMesh() {
           tex.colorSpace = THREE.SRGBColorSpace;
           resolve(tex);
         }, undefined, () => {
-          // Fallback: 1×1 pixel texture
           const fallback = new THREE.DataTexture(new Uint8Array([128, 128, 128, 255]), 1, 1);
           fallback.needsUpdate = true;
           resolve(fallback);
@@ -211,7 +215,7 @@ export function TerrainMesh() {
           tSand: { value: sand },
           tStone: { value: stone },
           tSnow: { value: snow },
-          tColormap: { value: colormap },
+          tColormap: { value: cmap },
           maxHeight: { value: MAX_HEIGHT },
           terrainSize: { value: TERRAIN_SIZE },
           texRepeat: { value: 40.0 },
@@ -219,21 +223,25 @@ export function TerrainMesh() {
       });
       setMaterial(mat);
     });
-  }, [colormap]);
+
+    return () => { geo.dispose(); };
+  }, []);
+
+  if (!ready || !geoRef.current) return null;
 
   return (
     <mesh
       ref={meshRef}
-      geometry={geometry}
+      geometry={geoRef.current}
       rotation={[-Math.PI / 2, 0, 0]}
       position={[0, 0, 0]}
       receiveShadow
       material={material ?? undefined}
     >
       {/* Fallback material while textures load */}
-      {!material && (
+      {!material && cmapRef.current && (
         <meshStandardMaterial
-          map={colormap}
+          map={cmapRef.current}
           roughness={0.92}
           metalness={0.02}
           side={THREE.FrontSide}
@@ -248,9 +256,9 @@ export function TerrainMesh() {
 export function TerrainProps() {
   const props = useMemo(() => getTerrainProps(), []);
 
-  // Limit render count for performance — only render nearest ~200 props
-  // (full LOD system can be added later)
-  const MAX_RENDERED = 400;
+  // Limit render count for performance — keep low to prevent WebGL context loss
+  // (full LOD / instancing system can be added later)
+  const MAX_RENDERED = 80;
 
   return (
     <group>
