@@ -21,7 +21,12 @@ import { SkillEffects, type SkillEffectsHandle } from '../weapons/SkillEffects';
 import { Arrow, type ArrowData } from '../weapons/Arrow';
 import { LootChest } from '../world/LootChest';
 import { ScenePortal } from '../scenes/ScenePortal';
-import { getWeaponConfig, isRangedWeapon } from '../weapons/WeaponConfig';
+import { getWeaponConfig, isRangedWeapon, isMeleeWeapon } from '../weapons/WeaponConfig';
+import { tickProjectileHits, applyMeleeDamage, applySkillDamage } from '../combat/ProjectileHitSystem';
+import { SPELLS } from '../content/spells';
+import type { MagicProjectileState } from '../weapons/MagicProjectile';
+import { getComboStep } from '../weapons/WeaponManager';
+import { getYaw } from '../player/CameraController';
 import { UNIT_REGISTRY } from '../units/UnitRegistry';
 import { UnitCharacter } from '../units/UnitCharacter';
 import { BulletDecals } from './BulletDecals';
@@ -405,6 +410,62 @@ function EngineLoop() {
       }
       audioManager.playGunshot(0);
     }
+
+    // ── Melee hit → apply damage to enemies in arc ────────────────────────
+    if (weaponResult.meleeHit) {
+      const store = useGameStore.getState();
+      const cfg = getWeaponConfig(store.weaponMode);
+      const yaw = getYaw();
+      applyMeleeDamage(
+        store.playerPosition,
+        yaw + Math.PI, // facing direction from camera yaw
+        cfg.range,
+        cfg.hitArc,
+        cfg.damage,
+        getComboStep(),
+      );
+    }
+
+    // ── Skill used → apply damage + spawn VFX/magic projectile ────────────
+    if (weaponResult.skillUsed) {
+      const store = useGameStore.getState();
+      const skill = weaponResult.skillUsed;
+      const yaw = getYaw();
+
+      // Staff skills spawn magic projectiles
+      if (store.weaponMode === 'staff' && skill.hitShape === 'ray') {
+        const spellDef = SPELLS.find(s => s.id === 'orb') ?? SPELLS[0];
+        const cam = state.camera;
+        const dir = new THREE.Vector3();
+        cam.getWorldDirection(dir);
+        const pos = new THREE.Vector3();
+        cam.getWorldPosition(pos);
+        pos.addScaledVector(dir, 1.5);
+
+        const proj: MagicProjectileState = {
+          id: `magic-${Date.now()}-${Math.random()}`,
+          spell: {
+            type: spellDef.id,
+            color: spellDef.color,
+            coreColor: spellDef.coreColor,
+            damage: skill.damage,
+            speed: spellDef.speed,
+            radius: spellDef.radius,
+          },
+          position: pos,
+          direction: dir.clone(),
+          age: 0,
+          maxAge: 4,
+        };
+        store.addMagicProjectile(proj);
+      } else {
+        // Non-staff skills: direct damage in area
+        applySkillDamage(store.playerPosition, yaw + Math.PI, skill);
+      }
+    }
+
+    // ── Projectile hit detection (arrows + magic vs enemies) ──────────────
+    tickProjectileHits();
 
     // Grenade throw (G key)
     if (inputManager.justPressed('KeyG')) {

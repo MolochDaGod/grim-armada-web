@@ -77,9 +77,13 @@ export function weaponManagerTick(dt: number): { fired: boolean; meleeHit: boole
     input.keys.reload = false;
   }
 
-  // ── Ranged fire (LMB while aiming) ────────────────────────────────────
+  // ── Ranged fire (LMB while aiming) ────────────────────────────────
   const now = performance.now() / 1000;
   if (input.mouse.lmb && isRangedWeapon(store.weaponMode) && store.playerMode === 'combat') {
+    // Auto-reload when empty (three-fps pattern)
+    if (store.ammo <= 0 && !store.isReloading) {
+      store.reload();
+    }
     if (!store.isReloading && now - _lastFireTime >= cfg.attackSpeed) {
       if (store.shoot()) {
         _lastFireTime = now;
