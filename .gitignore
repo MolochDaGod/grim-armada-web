@@ -3,3 +3,7 @@ dist
 .env
 .env.*
 .vercel
+
+# Large FBX animation packs (serve from CDN in prod)
+public/models/animations/rifle-locomotion/*.fbx
+*.zip
