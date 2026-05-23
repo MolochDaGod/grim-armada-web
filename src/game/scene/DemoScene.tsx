@@ -4,7 +4,7 @@ import { Text, Stars, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import { useGameStore } from '../store';
 import { GLTFModel } from './ModelLoader';
-import { BulletRenderer } from './BulletSystem';
+import { BulletRenderer, fireShot } from './BulletSystem';
 import { createAnimState, updateProceduralAnim, triggerShoot, triggerHit, triggerDeath, triggerAttack, triggerStagger, type AnimState } from './ProceduralAnim';
 import { ScreenShake, DamageNumbers } from './VFX';
 import { PostFX } from './PostFX';
@@ -401,7 +401,6 @@ function EngineLoop() {
         store.addArrow(arrow);
       } else {
         // Use existing bullet system with weapon-specific colors
-        const { fireShot } = require('./BulletSystem');
         fireShot(
           { x: origin.x, y: origin.y, z: origin.z },
           { x: target.x, y: target.y, z: target.z },
