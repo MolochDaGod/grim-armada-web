@@ -10,7 +10,7 @@ import { ScreenShake, DamageNumbers } from './VFX';
 import { PostFX } from './PostFX';
 import { WeaponView } from './WeaponSystem';
 import { audioManager } from '../audio/AudioManager';
-import FullTerrain from '../terrain/TerrainMesh';
+import FullTerrain, { getWorldHeight } from '../terrain/TerrainMesh';
 // ===== New Engine Systems =====
 import { inputManager } from '../player/InputManager';
 import { cameraControllerTick } from '../player/CameraController';
@@ -123,7 +123,7 @@ function PlayerCharacter() {
   useFrame((_, dt) => {
     const cdt = Math.min(dt, 0.05);
     if (outerRef.current) {
-      outerRef.current.position.set(position[0], 0, position[2]);
+      outerRef.current.position.set(position[0], position[1], position[2]);
       outerRef.current.rotation.y = rotation;
     }
     const dx = position[0] - prevPos.current[0];
@@ -166,6 +166,47 @@ const ENEMY_FALLBACK_COLORS: Record<string, string> = {
 const AGGRO_RANGE = 20;
 const CHASE_SPEED = 4;
 const LEASH_RANGE = 35;
+
+// ===== Billboard health bar component — always faces camera =====
+function EnemyBillboard({ y, healthPct, actionPct }: { y: number; healthPct: number; actionPct: number }) {
+  const groupRef = useRef<THREE.Group>(null);
+  const { camera } = useThree();
+
+  useFrame(() => {
+    if (groupRef.current) {
+      groupRef.current.quaternion.copy(camera.quaternion);
+    }
+  });
+
+  return (
+    <group ref={groupRef} position={[0, y, 0]}>
+      {/* HP bar background */}
+      <mesh>
+        <planeGeometry args={[1.2, 0.12]} />
+        <meshBasicMaterial color="#111" transparent opacity={0.8} />
+      </mesh>
+      {/* HP fill */}
+      <mesh position={[(healthPct - 1) * 0.6, 0, 0.001]}>
+        <planeGeometry args={[1.2 * healthPct, 0.08]} />
+        <meshBasicMaterial color={healthPct > 0.5 ? '#4ade80' : healthPct > 0.25 ? '#f59e0b' : '#ef4444'} />
+      </mesh>
+      {/* Action bar */}
+      <mesh position={[0, -0.1, 0]}>
+        <planeGeometry args={[1.2, 0.06]} />
+        <meshBasicMaterial color="#111" transparent opacity={0.6} />
+      </mesh>
+      <mesh position={[(actionPct - 1) * 0.6, -0.1, 0.001]}>
+        <planeGeometry args={[1.2 * actionPct, 0.04]} />
+        <meshBasicMaterial color="#6d95c6" />
+      </mesh>
+      {/* Level badge */}
+      <mesh position={[-0.7, 0, 0.002]}>
+        <circleGeometry args={[0.1, 8]} />
+        <meshBasicMaterial color="#d4af37" />
+      </mesh>
+    </group>
+  );
+}
 
 function EnemyNPC({ actorId, name, color, pos, level, modelUrl }: {
   actorId: string; name: string; color: string; pos: [number, number, number]; level: number;
@@ -249,6 +290,12 @@ function EnemyNPC({ actorId, name, color, pos, level, modelUrl }: {
         animRef.current.isMoving = false;
       }
 
+      // Snap enemy Y to terrain height
+      currentPos.current[1] = getWorldHeight(currentPos.current[0], currentPos.current[2]);
+      if (enemy) {
+        enemy.position.y = currentPos.current[1];
+      }
+
       groupRef.current.position.set(currentPos.current[0], currentPos.current[1], currentPos.current[2]);
     }
 
@@ -286,35 +333,8 @@ function EnemyNPC({ actorId, name, color, pos, level, modelUrl }: {
         />
       </group>
 
-      {/* Health + Action bars */}
-      {!isDead && (
-        <group position={[0, 2.4, 0]}>
-          {/* HP bar background */}
-          <mesh>
-            <planeGeometry args={[1.2, 0.12]} />
-            <meshBasicMaterial color="#111" transparent opacity={0.8} />
-          </mesh>
-          {/* HP fill */}
-          <mesh position={[(healthPct - 1) * 0.6, 0, 0.001]}>
-            <planeGeometry args={[1.2 * healthPct, 0.08]} />
-            <meshBasicMaterial color={healthPct > 0.5 ? '#4ade80' : healthPct > 0.25 ? '#f59e0b' : '#ef4444'} />
-          </mesh>
-          {/* Action bar (smaller, below HP) */}
-          <mesh position={[0, -0.1, 0]}>
-            <planeGeometry args={[1.2, 0.06]} />
-            <meshBasicMaterial color="#111" transparent opacity={0.6} />
-          </mesh>
-          <mesh position={[(actionPct - 1) * 0.6, -0.1, 0.001]}>
-            <planeGeometry args={[1.2 * actionPct, 0.04]} />
-            <meshBasicMaterial color="#6d95c6" />
-          </mesh>
-          {/* Level badge */}
-          <mesh position={[-0.7, 0, 0.002]}>
-            <circleGeometry args={[0.1, 8]} />
-            <meshBasicMaterial color="#d4af37" />
-          </mesh>
-        </group>
-      )}
+      {/* Health + Action bars — billboarded to face camera */}
+      {!isDead && <EnemyBillboard y={2.4} healthPct={healthPct} actionPct={actionPct} />}
 
       {/* Name */}
       <Text
@@ -502,6 +522,25 @@ function ArrowRenderer() {
       ))}
     </>
   );
+}
+
+// ===== Dynamic Fog — updates fog color from day/night cycle =====
+function DynamicFog() {
+  const { scene } = useThree();
+
+  useFrame(() => {
+    const dayTime = useGameStore.getState().dayTime;
+    const fogColor = getFogColor(dayTime);
+    if (scene.fog) {
+      (scene.fog as THREE.Fog).color.setStyle(fogColor);
+    }
+    // Also update background to match
+    if (scene.background && scene.background instanceof THREE.Color) {
+      scene.background.setStyle(fogColor);
+    }
+  });
+
+  return null;
 }
 
 // ===== Dynamic Lighting — sun position/intensity from day/night cycle =====
@@ -855,6 +894,9 @@ export default function DemoScene() {
     >
       <color attach="background" args={['#060a10']} />
       <fog attach="fog" args={['#060a10', 60, 300]} />
+
+      {/* Dynamic fog — updates color from day/night cycle */}
+      <DynamicFog />
 
       {/* Dynamic lighting — driven by day/night cycle */}
       <DynamicLighting />

@@ -226,37 +226,119 @@ function ControlsHelp() {
   );
 }
 
+// ===== Status Bar — Wave, Kills, Score, Gold =====
+function StatusBar() {
+  const wave = useGameStore(s => s.wave);
+  const kills = useGameStore(s => s.kills);
+  const score = useGameStore(s => s.score);
+  const gold = useGameStore(s => s.gold);
+  const dayTime = useGameStore(s => s.dayTime);
+  const weaponMode = useGameStore(s => s.weaponMode);
+  const ammo = useGameStore(s => s.ammo);
+  const maxAmmo = useGameStore(s => s.maxAmmo);
+  const mana = useGameStore(s => s.mana);
+  const maxMana = useGameStore(s => s.maxMana);
+  const playerMode = useGameStore(s => s.playerMode);
+
+  const timeOfDay = dayTime < 0.2 ? 'Night' : dayTime < 0.35 ? 'Dawn' : dayTime < 0.65 ? 'Day' : dayTime < 0.8 ? 'Dusk' : 'Night';
+
+  return (
+    <div className="absolute top-6 left-1/2 -translate-x-1/2" style={{ display: 'flex', gap: 12, pointerEvents: 'none' }}>
+      {/* Left cluster: game stats */}
+      <div style={{
+        display: 'flex', gap: 8, padding: '6px 14px',
+        borderRadius: 999, background: 'rgba(15,12,10,0.85)',
+        border: `1px solid ${GD.lineSoft}`,
+        fontSize: 12, color: GD.muted, alignItems: 'center',
+      }}>
+        <span style={{ color: GD.gold }}>⚔ Wave {wave}</span>
+        <span>💀 {kills}</span>
+        <span>⭐ {score}</span>
+        <span style={{ color: '#FFD700' }}>🪙 {gold}</span>
+        <span style={{ color: '#6688cc', fontSize: 10 }}>☀ {timeOfDay}</span>
+      </div>
+      {/* Right cluster: weapon/mode */}
+      <div style={{
+        display: 'flex', gap: 8, padding: '6px 14px',
+        borderRadius: 999, background: 'rgba(15,12,10,0.85)',
+        border: `1px solid ${GD.lineSoft}`,
+        fontSize: 12, color: GD.muted, alignItems: 'center',
+      }}>
+        <span style={{ color: playerMode === 'combat' ? GD.red : GD.green, textTransform: 'uppercase', fontSize: 10, fontWeight: 700 }}>
+          {playerMode}
+        </span>
+        <span style={{ color: GD.text }}>{weaponMode}</span>
+        {ammo > 0 && <span>{ammo}/{maxAmmo}</span>}
+        <span style={{ color: '#aa88ff' }}>✦ {Math.round(mana)}/{maxMana}</span>
+      </div>
+    </div>
+  );
+}
+
+// ===== Death Overlay =====
+function DeathOverlay() {
+  const ham = useGameStore(s => s.ham);
+  const resetGame = useGameStore(s => s.resetGame);
+  const isDead = ham.isDead;
+
+  if (!isDead) return null;
+
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center" style={{
+      zIndex: 100, background: 'rgba(20,0,0,0.75)',
+    }}>
+      <div style={{
+        fontSize: 36, fontWeight: 700, color: '#c96d63',
+        fontFamily: "'Cinzel Decorative', serif",
+        textShadow: '0 0 20px #c96d6366',
+        marginBottom: 16,
+      }}>DEFEATED</div>
+      <div style={{ fontSize: 14, color: '#a39882', marginBottom: 24 }}>Your HAM pools have been depleted</div>
+      <button
+        onClick={resetGame}
+        style={{
+          padding: '10px 24px', borderRadius: 12,
+          background: 'linear-gradient(135deg, #d4af37, #b8952e)',
+          color: '#0f1419', fontFamily: "'Cinzel', serif",
+          fontWeight: 700, fontSize: 16, cursor: 'pointer',
+          border: '1px solid #e8cc66',
+          boxShadow: '0 0 20px #d4af3744',
+        }}
+      >
+        RESPAWN
+      </button>
+    </div>
+  );
+}
+
 // ===== Main HUD =====
 export default function GameHUD() {
   return (
     <div className="absolute inset-0 pointer-events-none [&>*]:pointer-events-auto">
       <PlayerFrame />
       <TargetFrame />
+      <StatusBar />
       <AbilityHotbar />
       <CombatLog />
       <ControlsHelp />
+      <DeathOverlay />
       <InputController />
     </div>
   );
 }
 
-// ===== Input Controller — Fortnite-style camera-relative movement =====
+// ===== Input Controller — handles Tab-targeting + Escape + terrain height =====
 function InputController() {
-  const keysRef = useRef(new Set<string>());
   const storeRef = useRef(useGameStore.getState());
 
-  // Keep storeRef always fresh without re-renders
   useEffect(() => {
     const unsub = useGameStore.subscribe((s) => { storeRef.current = s; });
     return unsub;
   }, []);
 
-  // Key listeners — mounted exactly once
+  // Key listeners — Tab for target cycling, Escape for pointer lock
   useEffect(() => {
     const onDown = (e: KeyboardEvent) => {
-      const key = e.key.toLowerCase();
-      keysRef.current.add(key);
-
       if (e.key === 'Tab') {
         e.preventDefault();
         const s = storeRef.current;
@@ -265,20 +347,21 @@ function InputController() {
         const idx = alive.findIndex(en => en.actorId === s.targetId);
         s.setTarget(alive[(idx + 1) % alive.length].actorId);
       }
-
-      if (key === 'r') storeRef.current.resetGame();
       // Escape exits pointer lock
-      if (key === 'escape') document.exitPointerLock();
+      if (e.key === 'Escape') document.exitPointerLock();
     };
-    const onUp = (e: KeyboardEvent) => keysRef.current.delete(e.key.toLowerCase());
 
     window.addEventListener('keydown', onDown);
-    window.addEventListener('keyup', onUp);
-    return () => { window.removeEventListener('keydown', onDown); window.removeEventListener('keyup', onUp); };
+    return () => window.removeEventListener('keydown', onDown);
   }, []);
 
   // Movement tick — camera-relative: W moves forward away from camera
+  // Uses terrain height sampling for proper Y positioning
   useEffect(() => {
+    // Dynamically import to avoid circular deps
+    let getHeight: ((x: number, z: number) => number) | null = null;
+    import('../../game/terrain/TerrainMesh').then(m => { getHeight = m.getWorldHeight; });
+
     let lastTime = performance.now();
     let rafId: number;
 
@@ -288,14 +371,16 @@ function InputController() {
       const dt = Math.min((now - lastTime) / 1000, 0.05);
       lastTime = now;
 
-      const keys = keysRef.current;
-      if (keys.size === 0) return;
-
       const s = storeRef.current;
-      const isSprinting = keys.has('shift');
-      const baseSpeed = isSprinting ? 14 : 8;
+      const isSprinting = s.cameraYaw !== undefined && (window as any).__keysDown?.has?.('shift');
+      // Read from InputManager keys for movement
+      const input = (window as any).__inputManager;
+      if (!input) return;
+      const keys = input.keys;
+      if (!keys) return;
+
+      const baseSpeed = keys.sprint ? 14 : 8;
       const speed = baseSpeed * dt;
-      const turnSpeed = 2.5 * dt;
 
       // Camera yaw defines "forward" — W moves away from camera
       const camYaw = s.cameraYaw;
@@ -308,31 +393,42 @@ function InputController() {
       let isMoving = false;
 
       // W/S — forward/backward relative to camera
-      if (keys.has('w')) { dx += fwdX * speed; dz += fwdZ * speed; isMoving = true; }
-      if (keys.has('s')) { dx -= fwdX * speed; dz -= fwdZ * speed; isMoving = true; }
-
-      // A/D — turn character (camera follows behind)
-      if (keys.has('a')) s.rotatePlayer(turnSpeed);
-      if (keys.has('d')) s.rotatePlayer(-turnSpeed);
+      if (keys.forward)  { dx += fwdX * speed; dz += fwdZ * speed; isMoving = true; }
+      if (keys.backward) { dx -= fwdX * speed; dz -= fwdZ * speed; isMoving = true; }
 
       // Q/E — strafe relative to camera
-      if (keys.has('q')) { dx -= rightX * speed; dz -= rightZ * speed; isMoving = true; }
-      if (keys.has('e')) { dx += rightX * speed; dz += rightZ * speed; isMoving = true; }
+      if (keys.strafeL) { dx -= rightX * speed; dz -= rightZ * speed; isMoving = true; }
+      if (keys.strafeR) { dx += rightX * speed; dz += rightZ * speed; isMoving = true; }
+
+      // A/D — turn character
+      const turnSpeed = 2.5 * dt;
+      if (keys.left)  s.rotatePlayer(turnSpeed);
+      if (keys.right) s.rotatePlayer(-turnSpeed);
 
       if (dx !== 0 || dz !== 0) {
         s.movePlayer(dx, dz);
+
+        // Sample terrain height at new position for Y
+        if (getHeight) {
+          const pos = useGameStore.getState().playerPosition;
+          const terrainY = getHeight(pos[0], pos[2]);
+          if (Math.abs(pos[1] - terrainY) > 0.01) {
+            useGameStore.setState({
+              playerPosition: [pos[0], terrainY, pos[2]] as [number, number, number],
+            });
+            s.playerActor.position.y = terrainY;
+          }
+        }
 
         // Smoothly rotate character to face movement direction
         if (isMoving) {
           const targetAngle = Math.atan2(-dx, -dz);
           let current = s.playerRotation;
           let diff = targetAngle - current;
-          // Normalize to [-PI, PI]
           while (diff > Math.PI) diff -= 2 * Math.PI;
           while (diff < -Math.PI) diff += 2 * Math.PI;
           const rotLerp = Math.min(1, 10 * dt);
           const newRot = current + diff * rotLerp;
-          // Set absolute rotation (bypass rotatePlayer's additive behavior)
           useGameStore.setState({ playerRotation: newRot });
         }
       }

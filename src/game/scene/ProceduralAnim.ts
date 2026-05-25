@@ -71,9 +71,10 @@ export function updateProceduralAnim(
     return;
   }
 
-  // Reset death state
-  group.rotation.z = 0;
-  group.scale.y = 1;
+  // Reset all transforms before applying current state
+  group.position.set(0, 0, 0);
+  group.rotation.set(0, 0, 0);
+  group.scale.set(1, 1, 1);
 
   // ===== Dodge roll =====
   if (anim.isDodging) {

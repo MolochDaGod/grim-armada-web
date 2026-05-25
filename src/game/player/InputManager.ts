@@ -70,6 +70,9 @@ class InputManager {
     window.addEventListener('mousemove', this._onMouseMove);
     window.addEventListener('wheel', this._onWheel, { passive: true });
     document.addEventListener('pointerlockchange', this._onLockChange);
+
+    // Expose to InputController in HUD for movement tick
+    (window as any).__inputManager = this;
   }
 
   destroy() {

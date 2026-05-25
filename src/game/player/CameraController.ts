@@ -123,7 +123,8 @@ export function cameraControllerTick(
 
   // ── Smooth follow player (XZ from raw pos, Y from smoothed baseHeight) ────
   const targetPlayerPos = new THREE.Vector3(playerPos[0], _baseHeight, playerPos[2]);
-  _smoothPlayerPos.lerp(targetPlayerPos, 1 - Math.pow(0.001, dt));
+  const followLerp = 1 - Math.exp(-12 * dt); // framerate-independent damped follow
+  _smoothPlayerPos.lerp(targetPlayerPos, followLerp);
 
   // ── Compute camera position (spherical offset from player) ────────────────
   const cosPitch = Math.cos(_pitch);
@@ -136,7 +137,8 @@ export function cameraControllerTick(
   const camZ = _smoothPlayerPos.z + cosYaw * cosPitch * _currentDist - sinYaw * _currentShX;
 
   const targetCamPos = new THREE.Vector3(camX, camY, camZ);
-  _smoothCamPos.lerp(targetCamPos, 1 - Math.pow(0.001, dt));
+  const camLerp = 1 - Math.exp(-14 * dt); // framerate-independent damped camera
+  _smoothCamPos.lerp(targetCamPos, camLerp);
 
   // ── Apply ────────────────────────────────────────────────────────────────
   camera.position.copy(_smoothCamPos);
