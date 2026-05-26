@@ -121,9 +121,10 @@ export const ASSET_PATHS = {
       barrel: '/models/terrain/barrel.glb',
     },
     units: {
-      notableIce: '/models/units/notable-ice.glb',
-      superheroSns: '/models/units/superhero-sns.glb',
-      tgeHero: '/models/units/tge-hero.glb',
+      // Hero placeholders — point at shipped GLBs until dedicated hero meshes land.
+      notableIce: '/models/enemies/mutant.glb',
+      superheroSns: '/models/enemies/alien.glb',
+      tgeHero: '/models/player/player.glb',
     },
   },
   // Textures

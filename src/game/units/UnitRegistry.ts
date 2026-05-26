@@ -36,7 +36,8 @@ export const UNIT_REGISTRY: UnitDef[] = [
   {
     id: 'notable-ice',
     name: 'Notable Ice',
-    mesh: '/models/units/notable-ice.glb',
+    // Placeholder mesh until dedicated hero GLB is shipped (see /public/models/units/).
+    mesh: '/models/enemies/mutant.glb',
     scale: 1.0,
     capsuleHH: 0.5,
     capsuleR: 0.35,
@@ -49,7 +50,7 @@ export const UNIT_REGISTRY: UnitDef[] = [
   {
     id: 'superhero-sns',
     name: 'Superhero SNS',
-    mesh: '/models/units/superhero-sns.glb',
+    mesh: '/models/enemies/alien.glb',
     scale: 1.0,
     capsuleHH: 0.5,
     capsuleR: 0.35,
@@ -62,7 +63,7 @@ export const UNIT_REGISTRY: UnitDef[] = [
   {
     id: 'tge-hero',
     name: 'TGE Hero',
-    mesh: '/models/units/tge-hero.glb',
+    mesh: '/models/player/player.glb',
     scale: 1.0,
     capsuleHH: 0.5,
     capsuleR: 0.35,

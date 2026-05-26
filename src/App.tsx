@@ -8,7 +8,8 @@ import { Crosshair, HitMarker, DamageFlash } from './game/scene/VFX';
 import { useGameStore } from './game/store';
 import { useSurvivalStore } from './game/survivalStore';
 import { audioManager } from './game/audio/AudioManager';
-import { getGrudgeClient } from './lib/grudge-sdk';
+import { getGrudgeClient, type GrudgeAuth } from './lib/grudge-sdk';
+import { AccountRow } from './components/AccountRow';
 
 function LoadingScreen() {
   return (
@@ -41,7 +42,12 @@ function LoadingScreen() {
   );
 }
 
-function TitleScreen({ onStart }: { onStart: () => void }) {
+function TitleScreen({ onStart, auth, onSignIn }: {
+  onStart: () => void;
+  auth: GrudgeAuth | null;
+  onSignIn: () => void;
+}) {
+  const isGuest = !auth || auth.username === 'Player' || auth.username?.startsWith('guest');
   return (
     <motion.div
       className="absolute inset-0 flex flex-col items-center justify-center"
@@ -129,6 +135,8 @@ function TitleScreen({ onStart }: { onStart: () => void }) {
         ENTER COMBAT DEMO
       </motion.button>
 
+      <AccountRow auth={auth} isGuest={isGuest} onSignIn={onSignIn} />
+
       {/* Controls hint */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -136,8 +144,8 @@ function TitleScreen({ onStart }: { onStart: () => void }) {
         transition={{ delay: 1.2, duration: 0.8 }}
         className="mt-12 text-center text-xs" style={{ color: '#555' }}
       >
-        <div>W/A/S/D — Move · Q/E — Strafe · Shift — Sprint · Tab — Target</div>
-        <div className="mt-1">Click to look · 1-4 — Abilities · Esc — Release cursor</div>
+        <div>W/A/S/D Ã¢â‚¬â€ Move Ã‚Â· Q/E Ã¢â‚¬â€ Strafe Ã‚Â· Shift Ã¢â‚¬â€ Sprint Ã‚Â· Tab Ã¢â‚¬â€ Target</div>
+        <div className="mt-1">Click to look Ã‚Â· 1-4 Ã¢â‚¬â€ Abilities Ã‚Â· Esc Ã¢â‚¬â€ Release cursor</div>
       </motion.div>
 
       <motion.div
@@ -146,7 +154,7 @@ function TitleScreen({ onStart }: { onStart: () => void }) {
         transition={{ delay: 1.5 }}
         className="absolute bottom-4 text-xs" style={{ color: '#555' }}
       >
-        Powered by Grudge Backend · grudgewarlords.com
+        Powered by Grudge Backend Ã‚Â· grudgewarlords.com
       </motion.div>
     </motion.div>
   );
@@ -154,10 +162,21 @@ function TitleScreen({ onStart }: { onStart: () => void }) {
 
 export default function App() {
   const [started, setStarted] = useState(false);
+  const [auth, setAuth] = useState<GrudgeAuth | null>(() => getGrudgeClient().getAuth());
   const addLog = useGameStore(s => s.addLog);
   const initSurvival = useSurvivalStore(s => s.initSurvivalSystems);
   const survivalTick = useSurvivalStore(s => s.survivalTick);
   const playerPosition = useGameStore(s => s.playerPosition);
+
+  // Prime auth on mount — restore saved session or create a guest Grudge ID up front.
+  useEffect(() => {
+    const client = getGrudgeClient();
+    if (client.isAuthenticated()) {
+      setAuth(client.getAuth());
+      return;
+    }
+    client.loginAsGuest().then(a => setAuth(a)).catch(() => { /* offline-friendly */ });
+  }, []);
 
   // Init survival systems on game start
   useEffect(() => {
@@ -192,16 +211,16 @@ export default function App() {
     audioManager.playUIClick();
 
     setStarted(true);
-    addLog('Welcome to GRUDA Wars — Survival Explorer', 'system');
-    addLog('WASD move · Tab toggle Combat/Harvest · I Inventory · P Character', 'system');
-    addLog('E to harvest resources · Shift+C to craft', 'system');
+    addLog('Welcome to GRUDA Wars - Survival Explorer', 'system');
+    addLog('WASD move - Tab Combat/Harvest - I Inventory - P Character', 'system');
+    addLog('E to harvest resources - Shift+C to craft', 'system');
   };
 
   return (
     <div className="relative w-full h-full">
       <AnimatePresence mode="wait">
         {!started ? (
-          <TitleScreen key="title" onStart={handleStart} />
+          <TitleScreen key="title" onStart={handleStart} auth={auth} onSignIn={() => getGrudgeClient().redirectToLogin()} />
         ) : (
           <motion.div
             key="game"

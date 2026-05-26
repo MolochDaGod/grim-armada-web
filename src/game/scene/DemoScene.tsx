@@ -29,6 +29,7 @@ import { getComboStep } from '../weapons/WeaponManager';
 import { getYaw } from '../player/CameraController';
 import { UNIT_REGISTRY } from '../units/UnitRegistry';
 import { UnitCharacter } from '../units/UnitCharacter';
+import { SceneErrorBoundary } from '../../components/SceneErrorBoundary';
 import { BulletDecals } from './BulletDecals';
 import { ExplosionSystem } from '../vfx/Explosion';
 import { MuzzleFlashSystem, triggerMuzzleFlash } from '../vfx/MuzzleFlash';
@@ -856,17 +857,19 @@ function UnitShowcase() {
         const spacing = 5;
         const x = (i - (UNIT_REGISTRY.length - 1) / 2) * spacing;
         return (
-          <Suspense key={unit.id} fallback={null}>
-            <UnitCharacter
-              def={unit}
-              position={[x, 0, 20]}
-              rotation={Math.PI}
-              height={2.2}
-              selected
-            />
-            <Pedestal position={[x, 0, 20]} radius={1.2} />
-            <pointLight position={[x, 4, 20]} intensity={1.2} color={unit.color} distance={8} />
-          </Suspense>
+          <SceneErrorBoundary key={unit.id} fallback={<Pedestal position={[x, 0, 20]} radius={1.2} />}>
+            <Suspense fallback={null}>
+              <UnitCharacter
+                def={unit}
+                position={[x, 0, 20]}
+                rotation={Math.PI}
+                height={2.2}
+                selected
+              />
+              <Pedestal position={[x, 0, 20]} radius={1.2} />
+              <pointLight position={[x, 4, 20]} intensity={1.2} color={unit.color} distance={8} />
+            </Suspense>
+          </SceneErrorBoundary>
         );
       })}
     </group>
