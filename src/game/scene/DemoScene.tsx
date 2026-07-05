@@ -932,7 +932,9 @@ export default function DemoScene() {
       <SkillEffects ref={skillEffectsRef} />
 
       {/* Enhanced post-processing stack */}
-      <PostFX />
+      <SceneErrorBoundary>
+        <PostFX />
+      </SceneErrorBoundary>
 
       <Suspense fallback={null}>
         <Terrain />
