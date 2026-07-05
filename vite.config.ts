@@ -38,6 +38,12 @@ export default defineConfig({
   },
   server: {
     proxy: {
+      // Auth must hit id.grudge-studio.com (more specific rule first)
+      '/api/auth': {
+        target: 'https://id.grudge-studio.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
       '/api': {
         target: process.env.VITE_BACKEND_URL || 'https://grudgewarlords.com',
         changeOrigin: true,

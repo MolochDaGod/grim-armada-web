@@ -12,33 +12,59 @@ const env = (key: string, fallback: string): string => {
   return fallback;
 };
 
-const isProduction = env('MODE', '') === 'production'
-  || env('VITE_ENV', '') === 'production'
-  || (typeof window !== 'undefined' && window.location.hostname !== 'localhost');
+const isBrowser = (): boolean => typeof window !== 'undefined';
+
+const isDeployedApp = (): boolean =>
+  isBrowser() && window.location.hostname !== 'localhost';
 
 // ============================================================
-// Service URLs
+// Service URLs (runtime — never bake browser-only origins at build time)
 // ============================================================
 
-/** Auth Gateway — Grudge ID service */
-export const AUTH_GATEWAY_URL = env('VITE_AUTH_GATEWAY_URL', 'https://id.grudge-studio.com');
+/**
+ * Auth Gateway — Grudge ID service.
+ * Browser: same-origin `/api/auth/*` (vercel.json rewrites → id.grudge-studio.com).
+ */
+export function getAuthBase(): string {
+  const override = env('VITE_AUTH_GATEWAY_URL', '');
+  if (override) {
+    const base = override.replace(/\/$/, '');
+    return base.endsWith('/auth') ? base : `${base}/auth`;
+  }
+  if (isDeployedApp()) return '/api/auth';
+  return 'https://id.grudge-studio.com/auth';
+}
+
+/** Auth gateway root (for health checks / display) */
+export function getAuthGatewayUrl(): string {
+  const override = env('VITE_AUTH_GATEWAY_URL', '');
+  if (override) return override.replace(/\/$/, '').replace(/\/auth$/, '');
+  if (isDeployedApp()) return window.location.origin;
+  return 'https://id.grudge-studio.com';
+}
+
+/** @deprecated use getAuthGatewayUrl() — kept for imports that expect a constant */
+export const AUTH_GATEWAY_URL = 'https://id.grudge-studio.com';
 
 /** Grudge Backend — main API (VPS via Coolify/Traefik) */
 export const GRUDGE_API_URL = env('VITE_GRUDGE_API_URL', 'https://api.grudge-studio.com');
 
 /** Warlord Crafting Suite — character/crafting API */
-export const WCS_URL = env('VITE_WCS_URL',
-  isProduction ? 'https://grudgewarlords.com' : 'http://localhost:5000',
-);
+export function getWcsUrl(): string {
+  const override = env('VITE_WCS_URL', '');
+  if (override) return override.replace(/\/$/, '');
+  if (isDeployedApp()) return ''; // same-origin /api/* rewrites → grudgewarlords.com
+  return 'http://localhost:5000';
+}
 
 /** Colyseus game server — WebSocket endpoint */
 export const COLYSEUS_WS_URL = env('VITE_COLYSEUS_WS_URL',
-  isProduction ? 'wss://ws.grudge-studio.com' : 'ws://localhost:2567',
+  isBrowser() && isDeployedApp() ? 'wss://ws.grudge-studio.com' : 'ws://localhost:2567',
 );
 
 /** Colyseus HTTP endpoint (health, room listing) */
 export const COLYSEUS_HTTP_URL = env('VITE_COLYSEUS_HTTP_URL',
-  isProduction ? 'https://ws.grudge-studio.com' : 'http://localhost:2567',
+  isBrowser() && isDeployedApp() ? 'https://ws.grudge-studio.com' : 'http://localhost:2567',
 );
 
 /** ObjectStore — sprite/asset CDN (Cloudflare R2 via grudge-studio.com) */
@@ -48,47 +74,52 @@ export const OBJECTSTORE_URL = env('VITE_OBJECTSTORE_URL', 'https://assets.grudg
 export const ASSET_CDN_URL = env('VITE_ASSET_CDN_URL', 'https://assets.grudge-studio.com/grim-armada');
 
 /** Grudge Wars asset resolution API */
-export const GRUDGE_WARS_API_URL = env('VITE_GRUDGE_WARS_URL', 'https://grudgewarlords.com');
+export function getGrudgeWarsApiUrl(): string {
+  const override = env('VITE_GRUDGE_WARS_URL', '');
+  if (override) return override.replace(/\/$/, '');
+  if (isDeployedApp()) return ''; // same-origin /api/*
+  return 'https://grudgewarlords.com';
+}
 
 // ============================================================
-// API Endpoint Maps
+// API Endpoint Maps (lazy getters — evaluated in the browser at call time)
 // ============================================================
 
 export const AUTH_API = {
-  guest: `${AUTH_GATEWAY_URL}/auth/guest`,
-  register: `${AUTH_GATEWAY_URL}/auth/register`,
-  login: `${AUTH_GATEWAY_URL}/auth/login`,
-  verify: `${AUTH_GATEWAY_URL}/auth/verify`,
-  profile: `${AUTH_GATEWAY_URL}/auth/me`,
-  token: `${AUTH_GATEWAY_URL}/auth/token`,
-  exchange: `${AUTH_GATEWAY_URL}/auth/exchange`,
-} as const;
+  get guest() { return `${getAuthBase()}/guest`; },
+  get register() { return `${getAuthBase()}/register`; },
+  get login() { return `${getAuthBase()}/login`; },
+  get verify() { return `${getAuthBase()}/verify`; },
+  get profile() { return `${getAuthBase()}/me`; },
+  get token() { return `${getAuthBase()}/token`; },
+  get exchange() { return `${getAuthBase()}/exchange`; },
+};
 
 export const GAME_API = {
-  health: `${GRUDGE_API_URL}/health`,
-  characters: `${WCS_URL}/api/characters`,
-  character: (id: string) => `${WCS_URL}/api/characters/${id}`,
-  inventory: (charId: string) => `${WCS_URL}/api/inventory/${charId}`,
-  craftedItems: (charId: string) => `${WCS_URL}/api/crafted-items/${charId}`,
-  skills: (charId: string) => `${WCS_URL}/api/skills/${charId}`,
-  recipes: (charId: string) => `${WCS_URL}/api/recipes/${charId}`,
-  craft: `${WCS_URL}/api/craft`,
-  skillUnlock: `${WCS_URL}/api/skills/unlock`,
+  get health() { return `${GRUDGE_API_URL}/health`; },
+  get characters() { return `${getWcsUrl()}/api/characters`; },
+  character: (id: string) => `${getWcsUrl()}/api/characters/${id}`,
+  inventory: (charId: string) => `${getWcsUrl()}/api/inventory/${charId}`,
+  craftedItems: (charId: string) => `${getWcsUrl()}/api/crafted-items/${charId}`,
+  skills: (charId: string) => `${getWcsUrl()}/api/skills/${charId}`,
+  recipes: (charId: string) => `${getWcsUrl()}/api/recipes/${charId}`,
+  get craft() { return `${getWcsUrl()}/api/craft`; },
+  get skillUnlock() { return `${getWcsUrl()}/api/skills/unlock`; },
   shop: {
-    buyMaterial: `${WCS_URL}/api/shop/buy-material`,
-    sellMaterial: `${WCS_URL}/api/shop/sell-material`,
-    buyRecipe: `${WCS_URL}/api/shop/buy-recipe`,
+    get buyMaterial() { return `${getWcsUrl()}/api/shop/buy-material`; },
+    get sellMaterial() { return `${getWcsUrl()}/api/shop/sell-material`; },
+    get buyRecipe() { return `${getWcsUrl()}/api/shop/buy-recipe`; },
   },
-  grudaSync: `${WCS_URL}/api/gruda/sync`,
-  grudaPlayer: (id: string) => `${WCS_URL}/api/gruda/player/${id}`,
-} as const;
+  get grudaSync() { return `${getWcsUrl()}/api/gruda/sync`; },
+  grudaPlayer: (id: string) => `${getWcsUrl()}/api/gruda/player/${id}`,
+};
 
 export const ASSET_API = {
-  resolveAsset: `${GRUDGE_WARS_API_URL}/api/studio/resolve-asset`,
-  resolveAssetBatch: `${GRUDGE_WARS_API_URL}/api/studio/resolve-asset/batch`,
+  get resolveAsset() { return `${getGrudgeWarsApiUrl()}/api/studio/resolve-asset`; },
+  get resolveAssetBatch() { return `${getGrudgeWarsApiUrl()}/api/studio/resolve-asset/batch`; },
   objectStore: (path: string) => `${OBJECTSTORE_URL}/${path.replace(/^\//, '')}`,
   itemIcon: (category: string, filename: string) => `${OBJECTSTORE_URL}/api/v1/${category}/${filename}`,
-} as const;
+};
 
 export const COLYSEUS_API = {
   health: `${COLYSEUS_HTTP_URL}/colyseus/health`,
@@ -114,14 +145,18 @@ export async function pingService(url: string, timeoutMs = 5000): Promise<boolea
 
 /** Get status of all Grudge platform services */
 export async function getPlatformStatus() {
+  const authPing = getAuthBase() === '/api/auth'
+    ? '/api/auth/verify'
+    : `${getAuthGatewayUrl()}/health`;
+
   const [auth, api, colyseus] = await Promise.all([
-    pingService(`${AUTH_GATEWAY_URL}/health`),
+    pingService(authPing),
     pingService(GAME_API.health),
     pingService(COLYSEUS_API.health),
   ]);
 
   return {
-    auth: { url: AUTH_GATEWAY_URL, ok: auth },
+    auth: { url: getAuthGatewayUrl(), ok: auth },
     api: { url: GRUDGE_API_URL, ok: api },
     colyseus: { url: COLYSEUS_WS_URL, ok: colyseus },
     objectStore: { url: OBJECTSTORE_URL, ok: true },
