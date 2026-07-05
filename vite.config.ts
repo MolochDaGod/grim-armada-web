@@ -45,7 +45,7 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
       '/api': {
-        target: process.env.VITE_BACKEND_URL || 'https://grudgewarlords.com',
+        target: process.env.VITE_BACKEND_URL || 'https://api.grudge-studio.com',
         changeOrigin: true,
       },
     },
