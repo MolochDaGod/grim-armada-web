@@ -5,12 +5,16 @@
   "private": true,
   "scripts": {
     "dev": "vite --port 3000",
-    "build": "vite build",
+    "build": "node scripts/validate-assets.mjs && vite build",
+    "build:ci": "node scripts/validate-assets.mjs && vite build",
     "preview": "vite preview",
     "server": "tsx server/index.ts",
     "models:convert": "node scripts/convert-models.mjs",
     "models:optimize": "node scripts/optimize-models.mjs",
-    "assets:pipeline": "npm run models:convert && npm run models:optimize"
+    "assets:pipeline": "node scripts/assets-pipeline.mjs",
+    "assets:manifest": "node scripts/generate-manifest.mjs",
+    "assets:validate": "node scripts/validate-assets.mjs",
+    "predeploy": "npm run assets:validate"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",

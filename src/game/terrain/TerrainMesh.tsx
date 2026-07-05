@@ -13,6 +13,7 @@ import { useMemo, useRef, useEffect, useState } from 'react';
 import { useFrame, useLoader } from '@react-three/fiber';
 import * as THREE from 'three';
 import { GLTFModel } from '../scene/ModelLoader';
+import { resolveTexture } from '../../lib/assetResolver';
 import {
   generateTerrainData,
   generateColormap,
@@ -62,10 +63,10 @@ export function getWorldHeight(x: number, z: number): number {
 
 // ── Tileable texture paths (copied from THREE.Terrain-fork) ───────────────────
 const TEX_PATHS = {
-  grass: '/textures/terrain/grass.jpg',
-  sand:  '/textures/terrain/sand.jpg',
-  stone: '/textures/terrain/stone.jpg',
-  snow:  '/textures/terrain/snow.jpg',
+  grass: resolveTexture('/textures/terrain/grass.jpg'),
+  sand:  resolveTexture('/textures/terrain/sand.jpg'),
+  stone: resolveTexture('/textures/terrain/stone.jpg'),
+  snow:  resolveTexture('/textures/terrain/snow.jpg'),
 };
 
 // ── Biome splatmap shader — blends 4 tileable textures by height + biome ──────

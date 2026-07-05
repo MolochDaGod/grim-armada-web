@@ -3,6 +3,8 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+import { resolveModel } from '../../lib/assetResolver';
+import { getNormalizedHeight } from '../core/assetPresets';
 
 // ===== Shared loader instances =====
 const gltfLoader = new GLTFLoader();
@@ -123,6 +125,7 @@ interface GLTFModelProps {
   showFallback?: boolean;
   onClick?: (e: any) => void;
   onAnimationsLoaded?: (mixer: THREE.AnimationMixer, clips: THREE.AnimationClip[]) => void;
+  onLoaded?: (root: THREE.Group) => void;
 }
 
 export function GLTFModel({
@@ -136,6 +139,7 @@ export function GLTFModel({
   showFallback = true,
   onClick,
   onAnimationsLoaded,
+  onLoaded,
 }: GLTFModelProps) {
   const groupRef = useRef<THREE.Group>(null);
   const mixerRef = useRef<THREE.AnimationMixer | null>(null);
@@ -156,7 +160,8 @@ export function GLTFModel({
       groupRef.current.add(fb);
     }
 
-    loadGLTF(url)
+    const resolvedUrl = resolveModel(url);
+    loadGLTF(resolvedUrl)
       .then((cached) => {
         if (cancelled) return;
         const instance = cloneScene(cached.scene);
@@ -192,10 +197,11 @@ export function GLTFModel({
         instance.position.sub(new THREE.Vector3(center.x, box.min.y, center.z));
 
         // Scale to normalizedHeight or explicit scale
-        if (normalizedHeight) {
+        const targetHeight = normalizedHeight ?? getNormalizedHeight(url);
+        if (targetHeight) {
           const h = size.y;
           if (h > 0.001) {
-            const s = normalizedHeight / h;
+            const s = targetHeight / h;
             instance.scale.set(s, s, s);
             instance.position.multiplyScalar(s);
           }
@@ -225,6 +231,7 @@ export function GLTFModel({
           onAnimationsLoaded?.(mixer, cached.animations);
         }
 
+        onLoaded?.(instance);
         setLoadState('loaded');
       })
       .catch((err) => {

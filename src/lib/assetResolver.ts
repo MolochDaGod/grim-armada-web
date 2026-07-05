@@ -10,19 +10,32 @@
  *     → dev:  '/models/enemies/mutant.glb'
  */
 
-const ASSET_CDN = 'https://assets.grudge-studio.com';
-const ASSET_PREFIX = 'grim-armada'; // bucket prefix for this game
+const ASSET_CDN = (() => {
+  try {
+    if (import.meta.env.VITE_ASSET_CDN_URL) return import.meta.env.VITE_ASSET_CDN_URL as string;
+  } catch { /* */ }
+  return 'https://assets.grudge-studio.com';
+})();
+const ASSET_PREFIX = 'grim-armada';
 
 const isProd = typeof window !== 'undefined'
   && window.location.hostname !== 'localhost'
   && !window.location.hostname.includes('127.0.0.1');
+
+/** Prefer same-origin in dev; CDN in production deploys. */
+const useCdn = (): boolean => {
+  try {
+    if (import.meta.env.VITE_USE_LOCAL_ASSETS === 'true') return false;
+  } catch { /* */ }
+  return isProd;
+};
 
 /**
  * Resolve a model path. In production, prepends the CDN URL.
  * Falls back to local path if CDN is not configured or in dev.
  */
 export function resolveModel(localPath: string): string {
-  if (!isProd) return localPath;
+  if (!useCdn()) return localPath;
   // Strip leading slash for CDN path construction
   const clean = localPath.replace(/^\//, '');
   return `${ASSET_CDN}/${ASSET_PREFIX}/${clean}`;
@@ -46,7 +59,7 @@ export function resolveAsset(localPath: string): string {
  * Get the base CDN URL for constructing manual paths.
  */
 export function getAssetCDNBase(): string {
-  return isProd ? `${ASSET_CDN}/${ASSET_PREFIX}` : '';
+  return useCdn() ? `${ASSET_CDN}/${ASSET_PREFIX}` : '';
 }
 
 /**
@@ -130,14 +143,56 @@ export const ASSET_PATHS = {
   // Textures
   textures: {
     terrain: {
-      grass: '/textures/terrain/grass.png',
-      sand: '/textures/terrain/sand.png',
-      stone: '/textures/terrain/stone.png',
-      snow: '/textures/terrain/snow.png',
+      grass: '/textures/terrain/grass.jpg',
+      sand: '/textures/terrain/sand.jpg',
+      stone: '/textures/terrain/stone.jpg',
+      snow: '/textures/terrain/snow.jpg',
+      sky: '/textures/terrain/sky.jpg',
+      heightmap: '/textures/terrain/heightmap.png',
     },
   },
   // Animations
   animations: {
     rifleLocomotion: '/models/animations/rifle-locomotion/',
   },
+} as const;
+
+/** Flat model paths for scene placement (back-compat with DemoScene). */
+export const GAME_MODELS = {
+  player: ASSET_PATHS.models.player,
+  weaponRifle: ASSET_PATHS.models.weapons.rifle,
+  weaponAK: ASSET_PATHS.models.weapons.ak74u,
+  weaponSMG: ASSET_PATHS.models.weapons.smg,
+  mutant: ASSET_PATHS.models.enemies.mutant,
+  alien: ASSET_PATHS.models.enemies.alien,
+  spikeball: ASSET_PATHS.models.enemies.spikeball,
+  rock1: ASSET_PATHS.models.terrain.rock1,
+  rock2: ASSET_PATHS.models.terrain.rock2,
+  cliff1: ASSET_PATHS.models.terrain.cliff1,
+  cliff2: ASSET_PATHS.models.terrain.cliff2,
+  tree1: ASSET_PATHS.models.terrain.tree1,
+  bush: ASSET_PATHS.models.terrain.bush,
+  sandbags: ASSET_PATHS.models.terrain.sandbags,
+  barrel: ASSET_PATHS.models.terrain.barrel,
+  watchtower: ASSET_PATHS.models.structures.watchtower,
+  cabin: ASSET_PATHS.models.structures.cabin,
+  securityPost: ASSET_PATHS.models.structures.securityPost,
+  searchlight: ASSET_PATHS.models.structures.searchlight,
+  mainHouse: ASSET_PATHS.models.colony.mainHouse,
+  mainHouse2: ASSET_PATHS.models.colony.mainHouse2,
+  researchCenter: ASSET_PATHS.models.colony.researchCenter,
+  farm: ASSET_PATHS.models.colony.farm,
+  warehouse: ASSET_PATHS.models.colony.warehouse,
+  reactor: ASSET_PATHS.models.colony.reactor,
+  solarPanel: ASSET_PATHS.models.colony.solarPanel,
+  droneCarrier: ASSET_PATHS.models.colony.droneCarrier,
+  gateway: ASSET_PATHS.models.colony.gateway,
+  runway: ASSET_PATHS.models.colony.runway,
+  geoGenerator: ASSET_PATHS.models.colony.geoGenerator,
+  colonistHome: ASSET_PATHS.models.colony.colonistHome,
+  destroyer1: ASSET_PATHS.models.ships.destroyer1,
+  destroyer2: ASSET_PATHS.models.ships.destroyer2,
+  destroyer3: ASSET_PATHS.models.ships.destroyer3,
+  cruiser1: ASSET_PATHS.models.ships.cruiser1,
+  cruiser2: ASSET_PATHS.models.ships.cruiser2,
 } as const;

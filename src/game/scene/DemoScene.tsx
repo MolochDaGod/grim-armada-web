@@ -4,7 +4,7 @@ import { Text, Stars, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import { useGameStore } from '../store';
 import { GLTFModel } from './ModelLoader';
-import { BulletRenderer, fireShot } from './BulletSystem';
+import { BulletRenderer } from './BulletSystem';
 import { createAnimState, updateProceduralAnim, triggerShoot, triggerHit, triggerDeath, triggerAttack, triggerStagger, type AnimState } from './ProceduralAnim';
 import { ScreenShake, DamageNumbers } from './VFX';
 import { PostFX } from './PostFX';
@@ -12,71 +12,26 @@ import { WeaponView } from './WeaponSystem';
 import { audioManager } from '../audio/AudioManager';
 import FullTerrain, { getWorldHeight } from '../terrain/TerrainMesh';
 // ===== New Engine Systems =====
-import { inputManager } from '../player/InputManager';
-import { cameraControllerTick } from '../player/CameraController';
-import { weaponManagerTick, getCrosshairSpread } from '../weapons/WeaponManager';
-import { tickDayNight, getSunPosition, getAmbientIntensity, getSunIntensity, getFogColor } from '../survival/DayNightCycle';
+import { getCrosshairSpread } from '../weapons/WeaponManager';
+import { GameSystems } from '../core/GameSystems';
+import { GAME_MODELS as MODELS } from '../../lib/assetResolver';
+import { getNormalizedHeight } from '../core/assetPresets';
+import { attachWeaponToHand, weaponIKTilt } from '../player/WeaponIK';
+import { getSunPosition, getAmbientIntensity, getSunIntensity, getFogColor } from '../survival/DayNightCycle';
 import { MagicSystem } from '../weapons/MagicProjectile';
 import { SkillEffects, type SkillEffectsHandle } from '../weapons/SkillEffects';
-import { Arrow, type ArrowData } from '../weapons/Arrow';
+import { Arrow } from '../weapons/Arrow';
 import { LootChest } from '../world/LootChest';
 import { ScenePortal } from '../scenes/ScenePortal';
-import { getWeaponConfig, isRangedWeapon, isMeleeWeapon } from '../weapons/WeaponConfig';
-import { tickProjectileHits, applyMeleeDamage, applySkillDamage } from '../combat/ProjectileHitSystem';
-import { SPELLS } from '../content/spells';
-import type { MagicProjectileState } from '../weapons/MagicProjectile';
-import { getComboStep } from '../weapons/WeaponManager';
-import { getYaw } from '../player/CameraController';
+import { isRangedWeapon, isMeleeWeapon } from '../weapons/WeaponConfig';
 import { UNIT_REGISTRY } from '../units/UnitRegistry';
 import { UnitCharacter } from '../units/UnitCharacter';
 import { SceneErrorBoundary } from '../../components/SceneErrorBoundary';
 import { BulletDecals } from './BulletDecals';
 import { ExplosionSystem } from '../vfx/Explosion';
-import { MuzzleFlashSystem, triggerMuzzleFlash } from '../vfx/MuzzleFlash';
-import { GrenadeRenderer, createGrenadeFromCamera, type GrenadeData } from '../weapons/Grenade';
-// grenadeInput alias removed — inputManager already imported above
+import { MuzzleFlashSystem } from '../vfx/MuzzleFlash';
 
-// ===== Model paths (GLB) =====
-const MODELS = {
-  player: '/models/player/player.glb',
-  weaponRifle: '/models/weapons/assault_rifle.glb',
-  weaponAK: '/models/weapons/ak74u.glb',
-  weaponSMG: '/models/weapons/smg.glb',
-  mutant: '/models/enemies/mutant.glb',
-  alien: '/models/enemies/alien.glb',
-  spikeball: '/models/enemies/spikeball.glb',
-  rock1: '/models/terrain/rock1.glb',
-  rock2: '/models/terrain/rock2.glb',
-  cliff1: '/models/terrain/cliff1.glb',
-  cliff2: '/models/terrain/cliff2.glb',
-  tree1: '/models/terrain/tree1.glb',
-  bush: '/models/terrain/bush.glb',
-  sandbags: '/models/terrain/sandbags.glb',
-  barrel: '/models/terrain/barrel.glb',
-  watchtower: '/models/structures/watchtower.glb',
-  cabin: '/models/structures/cabin.glb',
-  securityPost: '/models/structures/security_post.glb',
-  searchlight: '/models/structures/searchlight.glb',
-  // Colony buildings (craftpix space colony pack)
-  mainHouse: '/models/colony/main_house.glb',
-  mainHouse2: '/models/colony/main_house_2lv.glb',
-  researchCenter: '/models/colony/research_center.glb',
-  farm: '/models/colony/farm.glb',
-  warehouse: '/models/colony/resource_warehouse.glb',
-  reactor: '/models/colony/reactor.glb',
-  solarPanel: '/models/colony/solar_panel.glb',
-  droneCarrier: '/models/colony/drone_carrier.glb',
-  gateway: '/models/colony/connecting_gateway.glb',
-  runway: '/models/colony/runway_strip.glb',
-  geoGenerator: '/models/colony/geothermal_generator.glb',
-  colonistHome: '/models/colony/home_colonists.glb',
-  // Battle ships (craftpix spaceship pack)
-  destroyer1: '/models/ships/destroyer_01.glb',
-  destroyer2: '/models/ships/destroyer_02.glb',
-  destroyer3: '/models/ships/destroyer_03.glb',
-  cruiser1: '/models/ships/light_cruiser_01.glb',
-  cruiser2: '/models/ships/light_cruiser_02.glb',
-};
+
 
 // ===== Footstep + Audio Tracker =====
 function AudioTracker() {
@@ -99,11 +54,15 @@ function AudioTracker() {
 function PlayerCharacter() {
   const outerRef = useRef<THREE.Group>(null);
   const modelRef = useRef<THREE.Group>(null);
+  const weaponMountRef = useRef<THREE.Group>(null);
+  const detachWeaponRef = useRef<(() => void) | null>(null);
   const animRef = useRef<AnimState>(createAnimState());
   const prevPos = useRef<[number, number, number]>([0, 0, 0]);
   const position = useGameStore(s => s.playerPosition);
   const rotation = useGameStore(s => s.playerRotation);
   const player = useGameStore(s => s.player);
+  const isAiming = useGameStore(s => s.isAiming);
+  const cameraPitch = useGameStore(s => s.cameraPitch);
 
   // Listen for attack results to trigger combat anims
   useEffect(() => {
@@ -135,16 +94,36 @@ function PlayerCharacter() {
     animRef.current.isSprinting = speed > 10;
     prevPos.current = [...position];
     if (modelRef.current) updateProceduralAnim(modelRef.current, animRef.current, cdt);
+    if (weaponMountRef.current) weaponIKTilt(weaponMountRef.current, cameraPitch, isAiming, cdt);
   });
+
+  const playerPath = MODELS.player;
+  const riflePath = MODELS.weaponRifle;
 
   return (
     <group ref={outerRef}>
       <group ref={modelRef}>
-        <GLTFModel url={MODELS.player} normalizedHeight={2.0} fallbackColor="#5588cc" />
+        <GLTFModel
+          url={playerPath}
+          normalizedHeight={getNormalizedHeight(playerPath)}
+          fallbackColor="#5588cc"
+          onLoaded={(root) => {
+            detachWeaponRef.current?.();
+            if (weaponMountRef.current) {
+              detachWeaponRef.current = attachWeaponToHand(root, weaponMountRef.current, {
+                position: [0.05, 0.02, 0.08],
+                rotation: [0, Math.PI / 2, 0],
+              });
+            }
+          }}
+        />
       </group>
-      {/* Weapon held in right hand area */}
-      <group position={[0.5, 1.0, -0.4]} rotation={[0, 0, -0.15]}>
-        <GLTFModel url={MODELS.weaponRifle} normalizedHeight={1.0} showFallback={false} />
+      <group ref={weaponMountRef}>
+        <GLTFModel
+          url={riflePath}
+          normalizedHeight={getNormalizedHeight(riflePath)}
+          showFallback={false}
+        />
       </group>
       {/* Selection glow ring */}
       <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -348,167 +327,6 @@ function EnemyNPC({ actorId, name, color, pos, level, modelUrl }: {
         {isDead ? `${name} (Dead)` : `[${level}] ${name}`}
       </Text>
     </group>
-  );
-}
-
-// ===== New Camera Controller — TPS/Action/FPS + ADS zoom + recoil + shoulder swap =====
-function NewCameraController() {
-  const { camera, gl } = useThree();
-  const position = useGameStore(s => s.playerPosition);
-
-  // Init InputManager + pointer lock on first mount
-  useEffect(() => {
-    inputManager.init();
-    const canvas = gl.domElement;
-    const onClick = () => {
-      if (!inputManager.isPointerLocked) canvas.requestPointerLock();
-    };
-    canvas.addEventListener('click', onClick);
-    return () => {
-      canvas.removeEventListener('click', onClick);
-    };
-  }, [gl]);
-
-  useFrame((_, dt) => {
-    const cdt = Math.min(dt, 0.05);
-    cameraControllerTick(cdt, camera as THREE.PerspectiveCamera, position);
-    inputManager.resetFrame();
-  });
-
-  return null;
-}
-
-// ===== Engine Loop — ticks weapon manager, day/night, grenades, combat systems =====
-function EngineLoop() {
-  const tick = useGameStore(s => s.tick);
-  const grenadesRef = useRef<GrenadeData[]>([]);
-
-  useFrame((state, dt) => {
-    const cdt = Math.min(dt, 0.05);
-    // Legacy combat tick
-    tick(cdt);
-
-    // Weapon manager tick — handles fire, reload, combo, skills, mana regen
-    const weaponResult = weaponManagerTick(cdt);
-
-    // If ranged weapon fired, spawn visual bullet + muzzle flash + audio
-    if (weaponResult.fired) {
-      const store = useGameStore.getState();
-      const cfg = getWeaponConfig(store.weaponMode);
-      const cam = state.camera;
-      const dir = new THREE.Vector3();
-      cam.getWorldDirection(dir);
-      const origin = new THREE.Vector3();
-      cam.getWorldPosition(origin);
-      origin.addScaledVector(dir, 1.0);
-      const target = origin.clone().addScaledVector(dir, cfg.range);
-
-      // Muzzle flash at weapon muzzle position
-      if (cfg.muzzleFlash) {
-        triggerMuzzleFlash(origin.clone(), cfg.trailColor);
-      }
-
-      // Spawn arrow for bow, bullet for others
-      if (store.weaponMode === 'bow') {
-        const arrow: ArrowData = {
-          id: `arrow-${Date.now()}-${Math.random()}`,
-          position: origin.clone(),
-          direction: dir.clone(),
-          speed: cfg.projectileSpeed,
-          gravity: cfg.projectileGravity,
-          lifetime: cfg.projectileLifetime,
-          trailColor: cfg.trailColor,
-        };
-        store.addArrow(arrow);
-      } else {
-        // Use existing bullet system with weapon-specific colors
-        fireShot(
-          { x: origin.x, y: origin.y, z: origin.z },
-          { x: target.x, y: target.y, z: target.z },
-          cfg.trailColor,
-        );
-      }
-      audioManager.playGunshot(0);
-    }
-
-    // ── Melee hit → apply damage to enemies in arc ────────────────────────
-    if (weaponResult.meleeHit) {
-      const store = useGameStore.getState();
-      const cfg = getWeaponConfig(store.weaponMode);
-      const yaw = getYaw();
-      applyMeleeDamage(
-        store.playerPosition,
-        yaw + Math.PI, // facing direction from camera yaw
-        cfg.range,
-        cfg.hitArc,
-        cfg.damage,
-        getComboStep(),
-      );
-    }
-
-    // ── Skill used → apply damage + spawn VFX/magic projectile ────────────
-    if (weaponResult.skillUsed) {
-      const store = useGameStore.getState();
-      const skill = weaponResult.skillUsed;
-      const yaw = getYaw();
-
-      // Staff skills spawn magic projectiles
-      if (store.weaponMode === 'staff' && skill.hitShape === 'ray') {
-        const spellDef = SPELLS.find(s => s.id === 'orb') ?? SPELLS[0];
-        const cam = state.camera;
-        const dir = new THREE.Vector3();
-        cam.getWorldDirection(dir);
-        const pos = new THREE.Vector3();
-        cam.getWorldPosition(pos);
-        pos.addScaledVector(dir, 1.5);
-
-        const proj: MagicProjectileState = {
-          id: `magic-${Date.now()}-${Math.random()}`,
-          spell: {
-            type: spellDef.id,
-            color: spellDef.color,
-            coreColor: spellDef.coreColor,
-            damage: skill.damage,
-            speed: spellDef.speed,
-            radius: spellDef.radius,
-          },
-          position: pos,
-          direction: dir.clone(),
-          age: 0,
-          maxAge: 4,
-        };
-        store.addMagicProjectile(proj);
-      } else {
-        // Non-staff skills: direct damage in area
-        applySkillDamage(store.playerPosition, yaw + Math.PI, skill);
-      }
-    }
-
-    // ── Projectile hit detection (arrows + magic vs enemies) ──────────────
-    tickProjectileHits();
-
-    // Grenade throw (G key)
-    if (inputManager.justPressed('KeyG')) {
-      const cam = state.camera;
-      const dir = new THREE.Vector3();
-      cam.getWorldDirection(dir);
-      const pos = new THREE.Vector3();
-      cam.getWorldPosition(pos);
-      grenadesRef.current.push(createGrenadeFromCamera(pos, dir));
-    }
-
-    // Day/night cycle
-    const newDayTime = tickDayNight(cdt);
-    useGameStore.setState({ dayTime: newDayTime });
-  });
-
-  // Grenade cleanup
-  const handleGrenadeExplode = (id: string) => {
-    grenadesRef.current = grenadesRef.current.filter(g => g.id !== id);
-  };
-
-  return (
-    <GrenadeRenderer grenades={grenadesRef.current} onExplode={handleGrenadeExplode} />
   );
 }
 
@@ -912,8 +730,7 @@ export default function DemoScene() {
       <SkyFleet />
 
       {/* ===== NEW ENGINE SYSTEMS ===== */}
-      <NewCameraController />
-      <EngineLoop />
+      <GameSystems />
       <AudioTracker />
       <BulletRenderer />
       <ArrowRenderer />

@@ -1,0 +1,312 @@
+{
+  "version": 1,
+  "game": "grim-armada",
+  "generated": "2026-07-05T08:55:03.383Z",
+  "cdnPrefix": "grim-armada",
+  "presets": {
+    "player": {
+      "normalizedHeight": 2,
+      "maxTexture": 1024
+    },
+    "default": {
+      "normalizedHeight": 2,
+      "maxTexture": 1024
+    }
+  },
+  "assets": [
+    {
+      "path": "/models/colony/connecting_gateway.glb",
+      "bytes": 54644,
+      "hash": "91a17b03039c",
+      "category": "structure",
+      "normalizedHeight": 8
+    },
+    {
+      "path": "/models/colony/drone_carrier.glb",
+      "bytes": 163720,
+      "hash": "31ab30ae4771",
+      "category": "structure",
+      "normalizedHeight": 8
+    },
+    {
+      "path": "/models/colony/farm.glb",
+      "bytes": 102056,
+      "hash": "074b5dd58127",
+      "category": "structure",
+      "normalizedHeight": 8
+    },
+    {
+      "path": "/models/colony/geothermal_generator.glb",
+      "bytes": 106196,
+      "hash": "0e14da1d7838",
+      "category": "structure",
+      "normalizedHeight": 8
+    },
+    {
+      "path": "/models/colony/home_colonists.glb",
+      "bytes": 142684,
+      "hash": "56c294d61477",
+      "category": "structure",
+      "normalizedHeight": 8
+    },
+    {
+      "path": "/models/colony/main_house.glb",
+      "bytes": 84928,
+      "hash": "2cb92e7e5ee8",
+      "category": "structure",
+      "normalizedHeight": 8
+    },
+    {
+      "path": "/models/colony/main_house_2lv.glb",
+      "bytes": 115012,
+      "hash": "407e7408c54d",
+      "category": "structure",
+      "normalizedHeight": 8
+    },
+    {
+      "path": "/models/colony/reactor.glb",
+      "bytes": 170384,
+      "hash": "2c50e76c3e2e",
+      "category": "structure",
+      "normalizedHeight": 8
+    },
+    {
+      "path": "/models/colony/research_center.glb",
+      "bytes": 211492,
+      "hash": "52750d0637ea",
+      "category": "structure",
+      "normalizedHeight": 8
+    },
+    {
+      "path": "/models/colony/resource_warehouse.glb",
+      "bytes": 75636,
+      "hash": "2e51ebaa18e8",
+      "category": "structure",
+      "normalizedHeight": 8
+    },
+    {
+      "path": "/models/colony/runway_strip.glb",
+      "bytes": 226560,
+      "hash": "824f1d9e793a",
+      "category": "structure",
+      "normalizedHeight": 8
+    },
+    {
+      "path": "/models/colony/solar_panel.glb",
+      "bytes": 81036,
+      "hash": "3e6b2b555ca3",
+      "category": "structure",
+      "normalizedHeight": 8
+    },
+    {
+      "path": "/models/enemies/alien.glb",
+      "bytes": 88080,
+      "hash": "df9d80da20ce",
+      "category": "enemy",
+      "normalizedHeight": 2
+    },
+    {
+      "path": "/models/enemies/mutant.glb",
+      "bytes": 487744,
+      "hash": "33fbb7971bf5",
+      "category": "enemy",
+      "normalizedHeight": 2
+    },
+    {
+      "path": "/models/enemies/spikeball.glb",
+      "bytes": 57052,
+      "hash": "1f4f979db321",
+      "category": "enemy",
+      "normalizedHeight": 2
+    },
+    {
+      "path": "/models/player/player.glb",
+      "bytes": 212492,
+      "hash": "15c2406497f8",
+      "category": "player",
+      "normalizedHeight": 2
+    },
+    {
+      "path": "/models/ships/destroyer_01.glb",
+      "bytes": 404676,
+      "hash": "f3d2d82e56cf",
+      "category": "ship",
+      "normalizedHeight": 25
+    },
+    {
+      "path": "/models/ships/destroyer_02.glb",
+      "bytes": 431984,
+      "hash": "91bd089c0bf7",
+      "category": "ship",
+      "normalizedHeight": 25
+    },
+    {
+      "path": "/models/ships/destroyer_03.glb",
+      "bytes": 452056,
+      "hash": "13ad551422e2",
+      "category": "ship",
+      "normalizedHeight": 25
+    },
+    {
+      "path": "/models/ships/light_cruiser_01.glb",
+      "bytes": 411124,
+      "hash": "45d5245fa90f",
+      "category": "ship",
+      "normalizedHeight": 25
+    },
+    {
+      "path": "/models/ships/light_cruiser_02.glb",
+      "bytes": 352,
+      "hash": "5439991ee5f1",
+      "category": "ship",
+      "normalizedHeight": 25
+    },
+    {
+      "path": "/models/structures/cabin.glb",
+      "bytes": 1518972,
+      "hash": "9c73d81461cc",
+      "category": "structure",
+      "normalizedHeight": 8
+    },
+    {
+      "path": "/models/structures/searchlight.glb",
+      "bytes": 119152,
+      "hash": "5cf8c3bb12fa",
+      "category": "structure",
+      "normalizedHeight": 8
+    },
+    {
+      "path": "/models/structures/security_post.glb",
+      "bytes": 514152,
+      "hash": "2d56478fbb1b",
+      "category": "structure",
+      "normalizedHeight": 8
+    },
+    {
+      "path": "/models/structures/watchtower.glb",
+      "bytes": 660112,
+      "hash": "27ad88578561",
+      "category": "structure",
+      "normalizedHeight": 8
+    },
+    {
+      "path": "/models/terrain/barrel.glb",
+      "bytes": 226092,
+      "hash": "9540a4289760",
+      "category": "terrain-prop",
+      "normalizedHeight": 3
+    },
+    {
+      "path": "/models/terrain/bush.glb",
+      "bytes": 39620,
+      "hash": "023617e18767",
+      "category": "terrain-prop",
+      "normalizedHeight": 3
+    },
+    {
+      "path": "/models/terrain/cliff1.glb",
+      "bytes": 66368,
+      "hash": "140581e9439a",
+      "category": "terrain-prop",
+      "normalizedHeight": 3
+    },
+    {
+      "path": "/models/terrain/cliff2.glb",
+      "bytes": 861960,
+      "hash": "f89a4c2259af",
+      "category": "terrain-prop",
+      "normalizedHeight": 3
+    },
+    {
+      "path": "/models/terrain/rock1.glb",
+      "bytes": 68444,
+      "hash": "c51e97695631",
+      "category": "terrain-prop",
+      "normalizedHeight": 3
+    },
+    {
+      "path": "/models/terrain/rock2.glb",
+      "bytes": 67888,
+      "hash": "b53f2e0c1a88",
+      "category": "terrain-prop",
+      "normalizedHeight": 3
+    },
+    {
+      "path": "/models/terrain/sandbags.glb",
+      "bytes": 92404,
+      "hash": "1a7d9e4887cd",
+      "category": "terrain-prop",
+      "normalizedHeight": 3
+    },
+    {
+      "path": "/models/terrain/tree1.glb",
+      "bytes": 670512,
+      "hash": "5383a10b043f",
+      "category": "terrain-prop",
+      "normalizedHeight": 3
+    },
+    {
+      "path": "/models/weapons/ak74u.glb",
+      "bytes": 238496,
+      "hash": "2d1f8077914f",
+      "category": "weapon",
+      "normalizedHeight": 1
+    },
+    {
+      "path": "/models/weapons/assault_rifle.glb",
+      "bytes": 175776,
+      "hash": "776f0b7d72f8",
+      "category": "weapon",
+      "normalizedHeight": 1
+    },
+    {
+      "path": "/models/weapons/smg.glb",
+      "bytes": 115988,
+      "hash": "ae5c98d6f7c9",
+      "category": "weapon",
+      "normalizedHeight": 1
+    },
+    {
+      "path": "/textures/terrain/grass.jpg",
+      "bytes": 65451,
+      "hash": "b7331aa0dcd2",
+      "category": "default",
+      "normalizedHeight": 2
+    },
+    {
+      "path": "/textures/terrain/heightmap.png",
+      "bytes": 9103,
+      "hash": "5b27f6cc8f4a",
+      "category": "default",
+      "normalizedHeight": 2
+    },
+    {
+      "path": "/textures/terrain/sand.jpg",
+      "bytes": 35660,
+      "hash": "0ae14332ecad",
+      "category": "default",
+      "normalizedHeight": 2
+    },
+    {
+      "path": "/textures/terrain/sky.jpg",
+      "bytes": 215856,
+      "hash": "7725b63ab258",
+      "category": "default",
+      "normalizedHeight": 2
+    },
+    {
+      "path": "/textures/terrain/snow.jpg",
+      "bytes": 33214,
+      "hash": "49d49798273b",
+      "category": "default",
+      "normalizedHeight": 2
+    },
+    {
+      "path": "/textures/terrain/stone.jpg",
+      "bytes": 27621,
+      "hash": "03080ad5c05e",
+      "category": "default",
+      "normalizedHeight": 2
+    }
+  ]
+}
