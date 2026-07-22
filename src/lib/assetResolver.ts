@@ -1,70 +1,92 @@
 /**
- * AssetResolver — resolves game asset paths to CDN or local.
+ * AssetResolver — resolve game asset paths for Grim Armada.
  *
- * Production: assets served from assets.grudge-studio.com (Cloudflare R2)
- * Development: assets served from local public/ directory
+ * Strategy (fleet best practice):
+ *   1. Same-origin `/models|textures|…` first — these ship with the Vercel build
+ *      from `public/` and are known-good on grim-armada-web.vercel.app.
+ *   2. Optional CDN (`assets.grudge-studio.com/grim-armada/…`) only when
+ *      `VITE_ASSET_CDN_URL` is set **and** `VITE_FORCE_ASSET_CDN=true`.
  *
- * Usage:
- *   resolveModel('/models/enemies/mutant.glb')
- *     → prod: 'https://assets.grudge-studio.com/grim-armada/models/enemies/mutant.glb'
- *     → dev:  '/models/enemies/mutant.glb'
+ * Previous prod default always hit CDN → 404 on every GLB → empty scene.
  */
+
+const DEFAULT_CDN = 'https://assets.grudge-studio.com';
 
 const ASSET_CDN = (() => {
   try {
-    if (import.meta.env.VITE_ASSET_CDN_URL) return import.meta.env.VITE_ASSET_CDN_URL as string;
+    if (import.meta.env.VITE_ASSET_CDN_URL) {
+      return String(import.meta.env.VITE_ASSET_CDN_URL).replace(/\/$/, '');
+    }
   } catch { /* */ }
-  return 'https://assets.grudge-studio.com';
+  return DEFAULT_CDN;
 })();
+
 const ASSET_PREFIX = 'grim-armada';
 
-const isProd = typeof window !== 'undefined'
-  && window.location.hostname !== 'localhost'
-  && !window.location.hostname.includes('127.0.0.1');
-
-/** Prefer same-origin in dev; CDN in production deploys. */
-const useCdn = (): boolean => {
-  try {
-    if (import.meta.env.VITE_USE_LOCAL_ASSETS === 'true') return false;
-  } catch { /* */ }
-  return isProd;
-};
+const isProd =
+  typeof window !== 'undefined' &&
+  window.location.hostname !== 'localhost' &&
+  !window.location.hostname.includes('127.0.0.1');
 
 /**
- * Resolve a model path. In production, prepends the CDN URL.
- * Falls back to local path if CDN is not configured or in dev.
+ * Only force CDN when explicitly opted-in. Same-origin public/ assets are
+ * the SSOT for Vercel deploys until R2 is fully seeded under grim-armada/.
  */
+const forceCdn = (): boolean => {
+  try {
+    if (import.meta.env.VITE_USE_LOCAL_ASSETS === 'true') return false;
+    if (import.meta.env.VITE_FORCE_ASSET_CDN === 'true') return true;
+  } catch { /* */ }
+  return false;
+};
+
+/** Primary URL for a model/texture path. */
 export function resolveModel(localPath: string): string {
-  if (!useCdn()) return localPath;
-  // Strip leading slash for CDN path construction
+  if (!localPath) return localPath;
+  // Absolute URLs pass through
+  if (/^https?:\/\//i.test(localPath)) return localPath;
+
   const clean = localPath.replace(/^\//, '');
+  if (forceCdn() && isProd) {
+    // VITE_ASSET_CDN_URL may already include /grim-armada
+    if (ASSET_CDN.includes(ASSET_PREFIX)) {
+      return `${ASSET_CDN}/${clean}`;
+    }
+    return `${ASSET_CDN}/${ASSET_PREFIX}/${clean}`;
+  }
+  return localPath.startsWith('/') ? localPath : `/${clean}`;
+}
+
+/**
+ * CDN candidate for fallback if same-origin load fails (ModelLoader uses this).
+ */
+export function resolveModelCdnFallback(localPath: string): string | null {
+  if (!localPath || /^https?:\/\//i.test(localPath)) return null;
+  if (forceCdn()) return null; // already on CDN as primary
+  const clean = localPath.replace(/^\//, '');
+  if (ASSET_CDN.includes(ASSET_PREFIX)) {
+    return `${ASSET_CDN}/${clean}`;
+  }
   return `${ASSET_CDN}/${ASSET_PREFIX}/${clean}`;
 }
 
-/**
- * Resolve a texture path.
- */
+/** Resolve a texture path. */
 export function resolveTexture(localPath: string): string {
-  return resolveModel(localPath); // same logic
+  return resolveModel(localPath);
 }
 
-/**
- * Resolve any asset path (generic).
- */
+/** Resolve any asset path (generic). */
 export function resolveAsset(localPath: string): string {
   return resolveModel(localPath);
 }
 
-/**
- * Get the base CDN URL for constructing manual paths.
- */
+/** Get the base CDN URL for constructing manual paths. */
 export function getAssetCDNBase(): string {
-  return useCdn() ? `${ASSET_CDN}/${ASSET_PREFIX}` : '';
+  if (ASSET_CDN.includes(ASSET_PREFIX)) return ASSET_CDN;
+  return `${ASSET_CDN}/${ASSET_PREFIX}`;
 }
 
-/**
- * Check if CDN is available (for fallback logic).
- */
+/** Check if CDN root responds (optional health). */
 export async function isAssetCDNReachable(timeoutMs = 3000): Promise<boolean> {
   try {
     const controller = new AbortController();
@@ -79,10 +101,9 @@ export async function isAssetCDNReachable(timeoutMs = 3000): Promise<boolean> {
 
 /**
  * Object storage paths for Grudge Armada game assets.
- * All paths relative to the CDN bucket prefix.
+ * Paths are same-origin public/ paths (CDN via resolveModel when forced).
  */
 export const ASSET_PATHS = {
-  // Models
   models: {
     player: '/models/player/player.glb',
     enemies: {
@@ -134,13 +155,11 @@ export const ASSET_PATHS = {
       barrel: '/models/terrain/barrel.glb',
     },
     units: {
-      // Hero placeholders — point at shipped GLBs until dedicated hero meshes land.
       notableIce: '/models/enemies/mutant.glb',
       superheroSns: '/models/enemies/alien.glb',
       tgeHero: '/models/player/player.glb',
     },
   },
-  // Textures
   textures: {
     terrain: {
       grass: '/textures/terrain/grass.jpg',
@@ -151,7 +170,6 @@ export const ASSET_PATHS = {
       heightmap: '/textures/terrain/heightmap.png',
     },
   },
-  // Animations
   animations: {
     rifleLocomotion: '/models/animations/rifle-locomotion/',
   },

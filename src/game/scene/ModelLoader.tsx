@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
-import { resolveModel } from '../../lib/assetResolver';
+import { resolveModel, resolveModelCdnFallback } from '../../lib/assetResolver';
 import { getNormalizedHeight } from '../core/assetPresets';
 
 // ===== Shared loader instances =====
@@ -160,8 +160,27 @@ export function GLTFModel({
       groupRef.current.add(fb);
     }
 
-    const resolvedUrl = resolveModel(url);
-    loadGLTF(resolvedUrl)
+    const primaryUrl = resolveModel(url);
+    const cdnFallback = resolveModelCdnFallback(url);
+
+    const tryLoad = (u: string) =>
+      loadGLTF(u).catch((err) => {
+        // If primary (CDN or local) fails, try the other once
+        if (cdnFallback && u !== cdnFallback) {
+          console.warn(`[ModelLoader] ${u} failed, trying CDN fallback`, err);
+          return loadGLTF(cdnFallback);
+        }
+        if (u !== url && u !== primaryUrl) throw err;
+        // Primary was CDN → try raw same-origin path
+        const local = url.startsWith('/') ? url : `/${url}`;
+        if (local !== u) {
+          console.warn(`[ModelLoader] ${u} failed, trying same-origin ${local}`, err);
+          return loadGLTF(local);
+        }
+        throw err;
+      });
+
+    tryLoad(primaryUrl)
       .then((cached) => {
         if (cancelled) return;
         const instance = cloneScene(cached.scene);
