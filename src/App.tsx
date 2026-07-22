@@ -1,15 +1,18 @@
 import { Suspense, useState, useEffect } from 'react';
+import { Route, Switch, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import DemoScene from './game/scene/DemoScene';
 import GameHUD from './components/game/GameHUD';
 import MainPanel from './components/game/MainPanel';
 import BottomHUD from './components/game/BottomHUD';
 import { Crosshair, HitMarker, DamageFlash } from './game/scene/VFX';
+import { SceneTransitionOverlay } from './components/SceneTransitionOverlay';
 import { useGameStore } from './game/store';
 import { useSurvivalStore } from './game/survivalStore';
 import { audioManager } from './game/audio/AudioManager';
 import { getGrudgeClient, type GrudgeAuth } from './lib/grudge-sdk';
 import { AccountRow } from './components/AccountRow';
+import AuthCallbackPage from './pages/AuthCallbackPage';
 
 function LoadingScreen() {
   return (
@@ -27,7 +30,8 @@ function LoadingScreen() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.4 }}
-        className="text-sm" style={{ color: '#a39882', fontFamily: "'Spectral SC', serif" }}
+        className="text-sm"
+        style={{ color: '#a39882', fontFamily: "'Spectral SC', serif" }}
       >
         Loading combat systems...
       </motion.div>
@@ -42,7 +46,11 @@ function LoadingScreen() {
   );
 }
 
-function TitleScreen({ onStart, auth, onSignIn }: {
+function TitleScreen({
+  onStart,
+  auth,
+  onSignIn,
+}: {
   onStart: () => void;
   auth: GrudgeAuth | null;
   onSignIn: () => void;
@@ -55,7 +63,6 @@ function TitleScreen({ onStart, auth, onSignIn }: {
       exit={{ opacity: 0, scale: 1.05 }}
       transition={{ duration: 0.5 }}
     >
-      {/* Animated particles background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {Array.from({ length: 30 }).map((_, i) => (
           <motion.div
@@ -90,8 +97,9 @@ function TitleScreen({ onStart, auth, onSignIn }: {
         style={{
           fontFamily: "'Cinzel Decorative', serif",
           background: 'linear-gradient(135deg, #d4af37, #e8cc66, #d4af37)',
-          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-          textShadow: 'none', filter: 'drop-shadow(0 0 20px #d4af3744)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          filter: 'drop-shadow(0 0 20px #d4af3744)',
         }}
       >
         GRIM ARMADA
@@ -127,7 +135,8 @@ function TitleScreen({ onStart, auth, onSignIn }: {
         className="px-8 py-3 rounded-lg text-lg font-bold cursor-pointer"
         style={{
           background: 'linear-gradient(135deg, #d4af37, #b8952e)',
-          color: '#0f1419', fontFamily: "'Cinzel', serif",
+          color: '#0f1419',
+          fontFamily: "'Cinzel', serif",
           boxShadow: '0 0 30px #d4af3744, inset 0 1px 0 #e8cc66',
           border: '1px solid #e8cc66',
         }}
@@ -137,109 +146,131 @@ function TitleScreen({ onStart, auth, onSignIn }: {
 
       <AccountRow auth={auth} isGuest={isGuest} onSignIn={onSignIn} />
 
-      {/* Controls hint */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 1.2, duration: 0.8 }}
-        className="mt-12 text-center text-xs" style={{ color: '#555' }}
+        className="mt-12 text-center text-xs"
+        style={{ color: '#555' }}
       >
-        <div>W/A/S/D Ã¢â‚¬â€ Move Ã‚Â· Q/E Ã¢â‚¬â€ Strafe Ã‚Â· Shift Ã¢â‚¬â€ Sprint Ã‚Â· Tab Ã¢â‚¬â€ Target</div>
-        <div className="mt-1">Click to look Ã‚Â· 1-4 Ã¢â‚¬â€ Abilities Ã‚Â· Esc Ã¢â‚¬â€ Release cursor</div>
+        <div>W/A/S/D — Move · Q/E — Strafe · Shift — Sprint · Tab — Target</div>
+        <div className="mt-1">Click to look · 1-4 — Abilities · Esc — Release cursor</div>
       </motion.div>
 
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 0.4 }}
         transition={{ delay: 1.5 }}
-        className="absolute bottom-4 text-xs" style={{ color: '#555' }}
+        className="absolute bottom-4 text-xs"
+        style={{ color: '#555' }}
       >
-        Powered by Grudge Backend Ã‚Â· grudgewarlords.com
+        Powered by Grudge Backend · Railway + id.grudge-studio.com
       </motion.div>
     </motion.div>
   );
 }
 
-export default function App() {
-  const [started, setStarted] = useState(false);
+function TitlePage() {
+  const [, setLocation] = useLocation();
   const [auth, setAuth] = useState<GrudgeAuth | null>(() => getGrudgeClient().getAuth());
-  const addLog = useGameStore(s => s.addLog);
-  const initSurvival = useSurvivalStore(s => s.initSurvivalSystems);
-  const survivalTick = useSurvivalStore(s => s.survivalTick);
-  const playerPosition = useGameStore(s => s.playerPosition);
 
-  // Prime auth on mount — restore saved session or create a guest Grudge ID up front.
   useEffect(() => {
     const client = getGrudgeClient();
     if (client.isAuthenticated()) {
       setAuth(client.getAuth());
       return;
     }
-    client.loginAsGuest().then(a => setAuth(a)).catch(() => { /* offline-friendly */ });
+    client.loginAsGuest().then((a) => setAuth(a)).catch(() => {});
   }, []);
 
-  // Init survival systems on game start
-  useEffect(() => {
-    if (!started) return;
-    initSurvival();
+  const handleStart = () => {
+    audioManager.init();
+    audioManager.startAmbient();
+    audioManager.playUIClick();
+    setLocation('/play');
+  };
 
-    // Auto-login as guest + start sync
+  return (
+    <TitleScreen
+      onStart={handleStart}
+      auth={auth}
+      onSignIn={() => getGrudgeClient().redirectToLogin(`${window.location.origin}/auth/callback`)}
+    />
+  );
+}
+
+function PlayPage() {
+  const addLog = useGameStore((s) => s.addLog);
+  const initSurvival = useSurvivalStore((s) => s.initSurvivalSystems);
+  const survivalTick = useSurvivalStore((s) => s.survivalTick);
+  const [booted, setBooted] = useState(false);
+
+  useEffect(() => {
+    audioManager.init();
+    audioManager.startAmbient();
+    initSurvival();
     const client = getGrudgeClient();
     if (!client.isAuthenticated()) {
       client.loginAsGuest().catch(() => {});
     }
+    if (!booted) {
+      addLog('Welcome to GRUDA Wars - Survival Explorer', 'system');
+      addLog('WASD move - Tab Combat/Harvest - I Inventory - P Character', 'system');
+      addLog('E to harvest / portal · portals at biome borders', 'system');
+      setBooted(true);
+    }
 
-    // Survival tick (runs alongside combat tick)
-    let rafId: number;
+    let rafId = 0;
     let lastTime = performance.now();
     const loop = () => {
       rafId = requestAnimationFrame(loop);
       const now = performance.now();
       const dt = Math.min((now - lastTime) / 1000, 0.1);
       lastTime = now;
-      survivalTick(dt, useSurvivalStore.getState().nearbyNode ? useGameStore.getState().playerPosition : [0, 0, 0]);
+      survivalTick(
+        dt,
+        useSurvivalStore.getState().nearbyNode
+          ? useGameStore.getState().playerPosition
+          : [0, 0, 0],
+      );
     };
     rafId = requestAnimationFrame(loop);
-
     return () => cancelAnimationFrame(rafId);
-  }, [started]);
+  }, [addLog, booted, initSurvival, survivalTick]);
 
-  const handleStart = () => {
-    // Init audio on user gesture (required by browsers)
-    audioManager.init();
-    audioManager.startAmbient();
-    audioManager.playUIClick();
+  return (
+    <motion.div
+      className="relative w-full h-full"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.6 }}
+    >
+      <Suspense fallback={<LoadingScreen />}>
+        <DemoScene />
+      </Suspense>
+      <GameHUD />
+      <MainPanel />
+      <BottomHUD />
+      <Crosshair />
+      <HitMarker />
+      <DamageFlash />
+      <SceneTransitionOverlay />
+    </motion.div>
+  );
+}
 
-    setStarted(true);
-    addLog('Welcome to GRUDA Wars - Survival Explorer', 'system');
-    addLog('WASD move - Tab Combat/Harvest - I Inventory - P Character', 'system');
-    addLog('E to harvest resources - Shift+C to craft', 'system');
-  };
-
+export default function App() {
   return (
     <div className="relative w-full h-full">
       <AnimatePresence mode="wait">
-        {!started ? (
-          <TitleScreen key="title" onStart={handleStart} auth={auth} onSignIn={() => getGrudgeClient().redirectToLogin()} />
-        ) : (
-          <motion.div
-            key="game"
-            className="relative w-full h-full"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6 }}
-          >
-            <Suspense fallback={<LoadingScreen />}>
-              <DemoScene />
-            </Suspense>
-            <GameHUD />
-            <MainPanel />
-            <BottomHUD />
-            <Crosshair />
-            <HitMarker />
-            <DamageFlash />
-          </motion.div>
-        )}
+        <Switch>
+          <Route path="/auth/callback" component={AuthCallbackPage} />
+          <Route path="/play" component={PlayPage} />
+          <Route path="/" component={TitlePage} />
+          <Route>
+            <TitlePage />
+          </Route>
+        </Switch>
       </AnimatePresence>
     </div>
   );

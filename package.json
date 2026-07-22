@@ -1,8 +1,11 @@
 {
   "name": "grim-armada-web",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite --port 3000",
     "build": "node scripts/validate-assets.mjs && vite build",
@@ -14,7 +17,9 @@
     "assets:pipeline": "node scripts/assets-pipeline.mjs",
     "assets:manifest": "node scripts/generate-manifest.mjs",
     "assets:validate": "node scripts/validate-assets.mjs",
-    "predeploy": "npm run assets:validate"
+    "predeploy": "npm run assets:validate",
+    "typecheck": "tsc --noEmit",
+    "probe:live": "node scripts/probe-live.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",

@@ -1,39 +1,43 @@
 # GRIM ARMADA
 
-Space survival shooter. 9 weapons, goal-driven AI, magic spells, grenades, day/night, 4 biomes, loot economy.
-Three.js R3F + Rapier + Zustand. **Grudge Studio** — *Racalvin The Pirate King*.
+Space survival shooter. Weapons, goal-driven AI, magic, grenades, day/night, 4 biome portals, loot.
+Three.js R3F + Rapier + Zustand. **Grudge Studio**.
 
-**Live:** grim-armada-web.vercel.app | **Backend:** grudgewarlords.com | **Assets:** assets.grudge-studio.com
+| | |
+|--|--|
+| **Live** | https://grim-armada-web.vercel.app · https://armada.grudge-studio.com |
+| **Auth** | https://id.grudge-studio.com (same-origin `/api/auth/*`) |
+| **Game API** | Railway `grudge-api-production-0d46` via `/api/*` rewrites |
+| **Assets** | Same-origin `/models` + `/textures` (Vercel `public/`). Optional R2 CDN with `VITE_FORCE_ASSET_CDN=true` |
 
 ---
 
-## Engine
+## SPA routes
 
-- **Weapons** — 9 modes x 4 skills = 36 total. Damage, combos, projectile physics, trail VFX, recoil, spread.
-- **Camera** — TPS/Action/FPS + ADS zoom (RMB, FOV 70-50, DOF blur). Smooth height, R reset, scroll zoom, V shoulder swap.
-- **AI** — Goal-driven brain (Dive/three-fps): Attack, Hunt, Explore, Dodge, GetHealth evaluators. 20s memory, 120deg vision, aim noise, 0.8s reaction time.
-- **Pathfinding** — A* NavGrid 150x150, 8-directional, LOS string-pull smoothing.
-- **VFX** — Explosions, muzzle flash, magic projectiles (orb/javelin/wave/nova), skill effects, arrow trails, bullet decals, grenades.
-- **PostFX** — SSAO, Bloom (dynamic), DOF (ADS), Chromatic Aberration, ACES, Vignette.
-- **World** — Day/night (5min cycle), 4 scene portals, loot chests, content registry with loot tables.
-- **Units** — 3 hero characters (Notable Ice, Superhero SNS, TGE Hero).
+| Path | Page |
+|------|------|
+| `/` | Title — ENTER COMBAT |
+| `/play` | Combat demo (Canvas + HUD) |
+| `/auth/callback` | Grudge ID SSO return |
 
-## Object Storage
+Biome **portals** (in-world, E key): Colony · Wasteland · Dungeon · Forge — teleport + fog tint via `useSceneStore`.
 
-Production assets from Cloudflare R2 at `assets.grudge-studio.com/grim-armada/`. Local fallback in dev.
+---
 
+## Asset policy (fleet best practice)
+
+1. **Default:** resolve models to same-origin paths shipped in `public/` (known-good on Vercel).
+2. **CDN:** only when `VITE_FORCE_ASSET_CDN=true` **and** R2 is seeded under `grim-armada/`.
+3. `ModelLoader` retries CDN or local on failure.
+4. Empty/stub GLBs (e.g. `light_cruiser_02`) are remapped in `assetResolver`.
+
+```bash
+npm run assets:validate   # pre-build gate
+npm run assets:pipeline   # optimize + manifest (local)
+npm run build             # validate + vite build
 ```
-models/enemies/     mutant, alien, spikeball (GLB)
-models/weapons/     assault_rifle, ak74u, smg
-models/colony/      12 space colony buildings
-models/ships/       3 destroyers + 2 cruisers
-models/structures/  cabin, watchtower, mining-station (voxel)
-models/terrain/     rocks, cliffs, trees, barrels
-models/units/       3 hero GLBs (CDN-only, 44-51MB each)
-textures/terrain/   grass, sand, stone, snow (tileable)
-```
 
-Resolver: `src/lib/assetResolver.ts` — `resolveModel(path)` returns CDN in prod, local in dev.
+---
 
 ## Controls
 
@@ -41,42 +45,37 @@ Resolver: `src/lib/assetResolver.ts` — `resolveModel(path)` returns CDN in pro
 |-----|--------|-----|--------|
 | WASD | Move | LMB | Fire/melee |
 | Q | Cycle weapon | RMB | ADS/block |
-| E | Interact | G | Grenade |
-| Shift | Sprint | R | Reload/cam reset |
-| Space | Jump | V | Shoulder swap |
-| C | Crouch | Tab | Combat/harvest |
-| 1-4 | Skills | Scroll | Zoom |
-| F | Mount | I/P/K | Inventory/char/skills |
+| E | Interact / portal | G | Grenade |
+| Shift | Sprint | R | Reload |
+| 1-4 | Skills | Tab | Combat/harvest |
+| I/P | Inventory / character | Esc | Release cursor |
+
+---
 
 ## Stack
 
-Three.js r172 + R3F 9, Rapier WASM, React 19, Tailwind v4, Zustand 5, Vite 6, Vercel, Grudge Backend.
-
-## Structure
+Three.js r172 + R3F 9, Rapier, React 19, Tailwind v4, Zustand 5, Vite 6, **wouter** routes, Vercel, Railway game-data.
 
 ```
-src/game/ai/          BotBrain, EnemyFSM, NavGrid, WaveSpawner
-src/game/weapons/     WeaponConfig, SkillSystem, Arrow, Grenade, MagicProjectile
-src/game/vfx/         Explosion, MuzzleFlash
-src/game/scene/       DemoScene, BulletSystem, BulletDecals, PostFX
-src/game/scenes/      useSceneStore, ScenePortal
-src/game/player/      InputManager, CameraController, CharacterController
-src/game/content/     enemies, harvestables, npcs, spells
-src/game/units/       UnitRegistry, UnitCharacter
-src/game/world/       LootChest
-src/game/survival/    DayNightCycle
-src/lib/              assetResolver, grudge-sdk, grudge-services
+src/App.tsx              SPA routes (wouter)
+src/pages/               AuthCallbackPage
+src/game/scenes/         useSceneStore, ScenePortal
+src/game/scene/          DemoScene, ModelLoader, PostFX
+src/game/core/           GameEngine, GameSystems, safeFrame
+src/lib/                 assetResolver, grudge-sdk, grudge-services
 ```
 
 ## Dev
 
 ```bash
-npm install && npm run dev    # :5173
-npm run build                 # Gzip + Brotli
+npm install
+npm run dev          # http://localhost:3000
+npm run build
+npm run preview
 ```
 
-Vercel auto-deploys from main. API rewrites to grudgewarlords.com + id.grudge-studio.com. CORS headers for CDN assets.
+Vercel auto-deploys **main**. Proxy in `vite.config.ts` mirrors production rewrites (auth → ID, API → Railway).
 
 ---
 
-*GRIM ARMADA (c) Grudge Studio. Racalvin The Pirate King.*
+*GRIM ARMADA © Grudge Studio*

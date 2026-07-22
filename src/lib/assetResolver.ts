@@ -142,7 +142,8 @@ export const ASSET_PATHS = {
       destroyer2: '/models/ships/destroyer_02.glb',
       destroyer3: '/models/ships/destroyer_03.glb',
       cruiser1: '/models/ships/light_cruiser_01.glb',
-      cruiser2: '/models/ships/light_cruiser_02.glb',
+      // light_cruiser_02.glb is an empty FBX2glTF stub (0-byte buffer) — reuse 01
+      cruiser2: '/models/ships/light_cruiser_01.glb',
     },
     terrain: {
       rock1: '/models/terrain/rock1.glb',

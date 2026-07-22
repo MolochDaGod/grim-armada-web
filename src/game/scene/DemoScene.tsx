@@ -23,6 +23,7 @@ import { SkillEffects, type SkillEffectsHandle } from '../weapons/SkillEffects';
 import { Arrow } from '../weapons/Arrow';
 import { LootChest } from '../world/LootChest';
 import { ScenePortal } from '../scenes/ScenePortal';
+import { useSceneStore, SCENE_META } from '../scenes/useSceneStore';
 import { isRangedWeapon, isMeleeWeapon } from '../weapons/WeaponConfig';
 import { UNIT_REGISTRY } from '../units/UnitRegistry';
 import { UnitCharacter } from '../units/UnitCharacter';
@@ -343,17 +344,23 @@ function ArrowRenderer() {
   );
 }
 
-// ===== Dynamic Fog — updates fog color from day/night cycle =====
+// ===== Dynamic Fog — day/night + active biome tint =====
 function DynamicFog() {
   const { scene } = useThree();
 
   useFrame(() => {
     const dayTime = useGameStore.getState().dayTime;
-    const fogColor = getFogColor(dayTime);
+    let fogColor = getFogColor(dayTime);
+    const sceneId = useSceneStore.getState().activeScene;
+    const hint = SCENE_META[sceneId]?.fogHint;
+    if (hint) {
+      const day = new THREE.Color(fogColor);
+      day.lerp(new THREE.Color(hint), 0.35);
+      fogColor = `#${day.getHexString()}`;
+    }
     if (scene.fog) {
       (scene.fog as THREE.Fog).color.setStyle(fogColor);
     }
-    // Also update background to match
     if (scene.background && scene.background instanceof THREE.Color) {
       scene.background.setStyle(fogColor);
     }

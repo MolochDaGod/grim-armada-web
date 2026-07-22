@@ -26,7 +26,8 @@ export default defineConfig({
           three: ['three', 'three-stdlib'],
           r3f: ['@react-three/fiber', '@react-three/drei', '@react-three/postprocessing'],
           physics: ['@dimforge/rapier3d-compat', '@react-three/rapier'],
-          ui: ['zustand', 'wouter'],
+          // Keep zustand alone — do not force wouter here (circular with r3f graph)
+          state: ['zustand'],
         },
       },
     },
@@ -44,8 +45,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
+      // Game-data SSOT — Railway (not dead api.grudge-studio.com)
       '/api': {
-        target: process.env.VITE_BACKEND_URL || 'https://api.grudge-studio.com',
+        target:
+          process.env.VITE_BACKEND_URL ||
+          'https://grudge-api-production-0d46.up.railway.app',
         changeOrigin: true,
       },
     },

@@ -62,10 +62,17 @@ export class GrudgeClient {
     }
   }
 
-  /** Redirect to unified Grudge auth page. */
+  /** Redirect to unified Grudge auth page (fleet allowlisted return). */
   redirectToLogin(returnUrl?: string) {
-    const redirect = encodeURIComponent(returnUrl || window.location.href);
-    window.location.href = `${GrudgeClient.AUTH_PAGE}?redirect=${redirect}&app=grim-armada`;
+    const dest = returnUrl || `${window.location.origin}/auth/callback`;
+    const q = new URLSearchParams({
+      redirect_uri: dest,
+      redirect: dest,
+      return: dest,
+      app: 'grim-armada',
+      origin: window.location.origin,
+    });
+    window.location.href = `${GrudgeClient.AUTH_PAGE}?${q.toString()}`;
   }
 
   /** Require auth — redirects if not logged in. */

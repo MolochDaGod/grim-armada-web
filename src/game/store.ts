@@ -160,6 +160,8 @@ interface GameStore {
   setTarget: (id: string | null) => void;
   useAbility: (abilityId: string) => void;
   movePlayer: (dx: number, dz: number) => void;
+  /** Teleport / scene spawn (portals, respawn). */
+  setPlayerPose: (pos: [number, number, number], rotationY?: number) => void;
   rotatePlayer: (angle: number) => void;
   setCameraRotation: (yaw: number, pitch: number) => void;
   addLog: (msg: string, type: CombatLogEntry['type']) => void;
@@ -417,6 +419,15 @@ export const useGameStore = create<GameStore>((set, get) => {
         ];
         s.playerActor.position = { x: newPos[0], y: newPos[1], z: newPos[2] };
         return { playerPosition: newPos };
+      });
+    },
+
+    setPlayerPose: (pos, rotationY) => {
+      set((s) => {
+        s.playerActor.position = { x: pos[0], y: pos[1], z: pos[2] };
+        const next: Partial<typeof s> = { playerPosition: pos };
+        if (typeof rotationY === 'number') next.playerRotation = rotationY;
+        return next;
       });
     },
 

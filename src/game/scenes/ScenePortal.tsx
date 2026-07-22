@@ -41,10 +41,11 @@ export function ScenePortal({ position, targetScene, label, color }: ScenePortal
   }, [nearby, targetScene, transitionTo]);
 
   useFrame(({ clock }) => {
-    // Proximity check
+    // Proximity — only setState when edge changes (avoid per-frame re-renders)
     const dx = playerPosition[0] - position[0];
     const dz = playerPosition[2] - position[2];
-    setNearby(Math.sqrt(dx * dx + dz * dz) < 4);
+    const isNear = Math.sqrt(dx * dx + dz * dz) < 4;
+    setNearby((prev) => (prev === isNear ? prev : isNear));
 
     // Animate ring + glow
     if (ringRef.current) {

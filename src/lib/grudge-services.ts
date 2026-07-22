@@ -46,15 +46,23 @@ export function getAuthGatewayUrl(): string {
 /** @deprecated use getAuthGatewayUrl() — kept for imports that expect a constant */
 export const AUTH_GATEWAY_URL = 'https://id.grudge-studio.com';
 
-/** Grudge Backend — main API (VPS via Coolify/Traefik) */
-export const GRUDGE_API_URL = env('VITE_GRUDGE_API_URL', 'https://api.grudge-studio.com');
+/** Grudge Backend — Railway game-data (same-origin /api on Vercel). */
+export function getGrudgeApiUrl(): string {
+  const override = env('VITE_GRUDGE_API_URL', '') || env('VITE_BACKEND_URL', '');
+  if (override) return override.replace(/\/$/, '');
+  if (isDeployedApp()) return ''; // same-origin /api/* → Railway via vercel.json
+  return 'https://grudge-api-production-0d46.up.railway.app';
+}
 
-/** Warlord Crafting Suite — character/crafting API */
+/** @deprecated use getGrudgeApiUrl() */
+export const GRUDGE_API_URL = 'https://grudge-api-production-0d46.up.railway.app';
+
+/** Character / account API base (same-origin in prod). */
 export function getWcsUrl(): string {
   const override = env('VITE_WCS_URL', '');
   if (override) return override.replace(/\/$/, '');
-  if (isDeployedApp()) return ''; // same-origin /api/* rewrites → grudgewarlords.com
-  return 'http://localhost:5000';
+  if (isDeployedApp()) return ''; // same-origin /api/* rewrites → Railway
+  return 'https://grudge-api-production-0d46.up.railway.app';
 }
 
 /** Colyseus game server — WebSocket endpoint */
@@ -96,7 +104,10 @@ export const AUTH_API = {
 };
 
 export const GAME_API = {
-  get health() { return `${GRUDGE_API_URL}/health`; },
+  get health() {
+    const base = getGrudgeApiUrl();
+    return base ? `${base}/api/health` : '/api/health';
+  },
   get characters() { return `${getWcsUrl()}/api/characters`; },
   character: (id: string) => `${getWcsUrl()}/api/characters/${id}`,
   inventory: (charId: string) => `${getWcsUrl()}/api/inventory/${charId}`,

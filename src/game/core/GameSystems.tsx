@@ -21,6 +21,7 @@ import type { MagicProjectileState } from '../weapons/MagicProjectile';
 import type { ArrowData } from '../weapons/Arrow';
 import { GrenadeRenderer, createGrenadeFromCamera, type GrenadeData } from '../weapons/Grenade';
 import { inputManager } from '../player/InputManager';
+import { clampDt, safeFrameTick } from './safeFrame';
 
 export function GameSystems() {
   const { camera, gl } = useThree();
@@ -33,7 +34,8 @@ export function GameSystems() {
   }, [gl]);
 
   useFrame((_state, dt) => {
-    const cdt = Math.min(dt, 0.05);
+    safeFrameTick('GameSystems', () => {
+    const cdt = clampDt(dt);
     const weaponResult = tickGameEngine(cdt, {
       camera: camera as THREE.PerspectiveCamera,
       playerPos: position,
@@ -130,6 +132,7 @@ export function GameSystems() {
 
     const newDayTime = tickDayNight(cdt);
     useGameStore.setState({ dayTime: newDayTime });
+    }); // safeFrameTick
   });
 
   const handleGrenadeExplode = (id: string) => {
