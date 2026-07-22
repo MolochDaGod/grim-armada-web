@@ -13,6 +13,7 @@ import { audioManager } from './game/audio/AudioManager';
 import { getGrudgeClient, type GrudgeAuth } from './lib/grudge-sdk';
 import { AccountRow } from './components/AccountRow';
 import AuthCallbackPage from './pages/AuthCallbackPage';
+import { GrokCoderChat } from './components/ai/GrokCoderChat';
 
 function LoadingScreen() {
   return (
@@ -255,6 +256,8 @@ function PlayPage() {
       <HitMarker />
       <DamageFlash />
       <SceneTransitionOverlay />
+      {/* Bottom-right fleet coding agent (deploy / assets / DB) */}
+      <GrokCoderChat />
     </motion.div>
   );
 }

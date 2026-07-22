@@ -22,6 +22,21 @@ Three.js R3F + Rapier + Zustand. **Grudge Studio**.
 
 Biome **portals** (in-world, E key): Colony · Wasteland · Dungeon · Forge — teleport + fog tint via `useSceneStore`.
 
+## Grok Coder (in-game AI, bottom-right)
+
+On `/play`, open **GROK CODER** for a fleet coding agent:
+
+| Command | What it does |
+|---------|----------------|
+| `/diag` | Deploy + assets + Railway API + auth + AI hub |
+| `/deploy` | Vercel origin, SPA routes, GLB shell |
+| `/assets` | Same-origin vs CDN + edit map |
+| `/db` | Railway Postgres game-data via `/api` |
+| `/map` | Production topology SSOT |
+| `/edit` | Where to change assets / DB / deploy files |
+
+Local tools always run in the browser. Optional LLM enrichment uses `ai.grudge-studio.com` (`/api/ai/*` rewrite) when a hub-valid JWT/API key is present.
+
 ---
 
 ## Asset policy (fleet best practice)

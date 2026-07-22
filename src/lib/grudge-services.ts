@@ -75,6 +75,14 @@ export const COLYSEUS_HTTP_URL = env('VITE_COLYSEUS_HTTP_URL',
   isBrowser() && isDeployedApp() ? 'https://ws.grudge-studio.com' : 'http://localhost:2567',
 );
 
+/** AI hub — grudge-ai-hub (chat may require API key; tools are local in-game) */
+export function getAiHubUrl(): string {
+  const override = env('VITE_AI_HUB_URL', '');
+  if (override) return override.replace(/\/$/, '');
+  if (isDeployedApp()) return '/api/ai'; // vercel rewrite → ai.grudge-studio.com
+  return 'https://ai.grudge-studio.com';
+}
+
 /** ObjectStore — sprite/asset CDN (Cloudflare R2 via grudge-studio.com) */
 export const OBJECTSTORE_URL = env('VITE_OBJECTSTORE_URL', 'https://assets.grudge-studio.com');
 

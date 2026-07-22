@@ -45,7 +45,13 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
-      // Game-data SSOT — Railway (not dead api.grudge-studio.com)
+      // AI hub — grudge-ai-hub (chat needs JWT/API key; tools are local)
+      '/api/ai': {
+        target: 'https://ai.grudge-studio.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/ai/, ''),
+      },
+      // Game-data SSOT — Railway
       '/api': {
         target:
           process.env.VITE_BACKEND_URL ||
