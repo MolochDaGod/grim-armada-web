@@ -33,7 +33,8 @@ export function GameSystems() {
   }, [gl]);
 
   useFrame((_state, dt) => {
-    const weaponResult = tickGameEngine(Math.min(dt, 0.05), {
+    const cdt = Math.min(dt, 0.05);
+    const weaponResult = tickGameEngine(cdt, {
       camera: camera as THREE.PerspectiveCamera,
       playerPos: position,
     });
