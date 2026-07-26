@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useGameStore } from '../../game/store';
+import { useGameStore, WEAPON_LOADOUTS } from '../../game/store';
 import { CombatState } from '../../game/core/types';
 
 // ===== Grudge Design Tokens (from grudge-guide.html) =====
@@ -209,11 +209,70 @@ function CombatLog() {
   );
 }
 
+// ===== Weapon tray — Z/X/C + R cycle =====
+function WeaponTray() {
+  const active = useGameStore((s) => s.activeWeaponId);
+  const setWeapon = useGameStore((s) => s.setActiveWeapon);
+
+  return (
+    <div
+      className="absolute right-4 flex flex-col gap-1.5"
+      style={{ bottom: 200 }}
+    >
+      <div
+        style={{
+          fontSize: 10,
+          letterSpacing: 1.2,
+          textTransform: 'uppercase',
+          color: GD.gold,
+          fontFamily: "'Cinzel', serif",
+          marginBottom: 2,
+        }}
+      >
+        Armory
+      </div>
+      {WEAPON_LOADOUTS.map((w) => {
+        const on = active === w.id;
+        return (
+          <button
+            key={w.id}
+            type="button"
+            onClick={() => setWeapon(w.id)}
+            title={`${w.name} [${w.hotkey}] · R cycle`}
+            style={{
+              minWidth: 120,
+              textAlign: 'left',
+              padding: '8px 10px',
+              borderRadius: 12,
+              border: `1px solid ${on ? 'rgba(214,172,87,0.55)' : GD.lineSoft}`,
+              background: on
+                ? 'linear-gradient(180deg, rgba(214,172,87,0.18), rgba(20,16,12,0.9))'
+                : 'rgba(20,16,12,0.85)',
+              color: on ? GD.goldStrong : GD.muted,
+              fontSize: 12,
+              cursor: 'pointer',
+            }}
+          >
+            <span style={{ fontFamily: 'monospace', color: GD.gold, marginRight: 6 }}>
+              {w.hotkey}
+            </span>
+            {w.name}
+          </button>
+        );
+      })}
+      <div style={{ fontSize: 10, color: GD.soft }}>R · cycle weapons</div>
+    </div>
+  );
+}
+
 // ===== Controls Help (grudge-guide shortcut chips) =====
 function ControlsHelp() {
-  const chips = ['W/S Fwd/Back', 'A/D Turn', 'Q/E Strafe', 'Tab Target/Mode', '1-4 Skills', 'I Bag', 'P Stats'];
+  const chips = [
+    'WASD Move', 'Shift Sprint', 'Click Look', 'Tab Target',
+    '1-4 Skills', 'Z/X/C Guns', 'R Cycle', 'I Bag', 'P Panel',
+  ];
   return (
-    <div className="absolute top-6 right-4 flex flex-wrap gap-1.5 max-w-48 justify-end">
+    <div className="absolute top-6 right-4 flex flex-wrap gap-1.5 max-w-52 justify-end">
       {chips.map(c => (
         <span key={c} style={{
           padding: '4px 8px', borderRadius: 999,
@@ -233,6 +292,7 @@ export default function GameHUD() {
       <PlayerFrame />
       <TargetFrame />
       <AbilityHotbar />
+      <WeaponTray />
       <CombatLog />
       <ControlsHelp />
       <InputController />

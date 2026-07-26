@@ -54,13 +54,21 @@ function createWeaponState(): WeaponState {
 // Global crosshair bloom state (read by VFX.tsx)
 export let crosshairBloomAmount = 0;
 
-export function WeaponView({ weaponUrl, normalizedHeight = 0.5 }: { weaponUrl: string; normalizedHeight?: number }) {
+export function WeaponView({ weaponUrl, normalizedHeight = 0.5 }: { weaponUrl?: string; normalizedHeight?: number }) {
   const groupRef = useRef<THREE.Group>(null);
   const ws = useRef<WeaponState>(createWeaponState());
   const prevYaw = useRef(0);
   const prevPitch = useRef(0);
 
   const position = useGameStore(s => s.playerPosition);
+  const activeWeaponId = useGameStore(s => s.activeWeaponId);
+  const resolvedUrl =
+    weaponUrl ||
+    (activeWeaponId === 'ak'
+      ? '/models/weapons/ak74u.glb'
+      : activeWeaponId === 'smg'
+        ? '/models/weapons/smg.glb'
+        : '/models/weapons/assault_rifle.glb');
   const prevPos = useRef<[number, number, number]>([0, 0, 0]);
 
   // Listen for shoot events
@@ -140,7 +148,13 @@ export function WeaponView({ weaponUrl, normalizedHeight = 0.5 }: { weaponUrl: s
 
   return (
     <group ref={groupRef} position={[0.25, -0.2, -0.4]}>
-      <GLTFModel url={weaponUrl} normalizedHeight={normalizedHeight} />
+      <GLTFModel
+        key={resolvedUrl}
+        url={resolvedUrl}
+        normalizedHeight={normalizedHeight}
+        showFallback={false}
+        autoPlayIdle={false}
+      />
     </group>
   );
 }

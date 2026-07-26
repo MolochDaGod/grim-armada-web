@@ -1,5 +1,6 @@
 import { Suspense, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Route, Switch, useLocation } from 'wouter';
 import DemoScene from './game/scene/DemoScene';
 import GameHUD from './components/game/GameHUD';
 import MainPanel from './components/game/MainPanel';
@@ -136,8 +137,8 @@ function TitleScreen({ onStart }: { onStart: () => void }) {
         transition={{ delay: 1.2, duration: 0.8 }}
         className="mt-12 text-center text-xs" style={{ color: '#555' }}
       >
-        <div>W/A/S/D — Move · Q/E — Strafe · Shift — Sprint · Tab — Target</div>
-        <div className="mt-1">Click to look · 1-4 — Abilities · Esc — Release cursor</div>
+        <div>WASD — Move · Shift — Sprint · Tab — Target · Click — Look</div>
+        <div className="mt-1">1–4 Skills · Z/X/C Weapons · R Cycle · I Inventory · P Character</div>
       </motion.div>
 
       <motion.div
@@ -152,25 +153,22 @@ function TitleScreen({ onStart }: { onStart: () => void }) {
   );
 }
 
-export default function App() {
-  const [started, setStarted] = useState(false);
+function PlaySession({ autoStart = false }: { autoStart?: boolean }) {
+  const [started, setStarted] = useState(autoStart);
   const addLog = useGameStore(s => s.addLog);
   const initSurvival = useSurvivalStore(s => s.initSurvivalSystems);
   const survivalTick = useSurvivalStore(s => s.survivalTick);
-  const playerPosition = useGameStore(s => s.playerPosition);
 
   // Init survival systems on game start
   useEffect(() => {
     if (!started) return;
     initSurvival();
 
-    // Auto-login as guest + start sync
     const client = getGrudgeClient();
     if (!client.isAuthenticated()) {
       client.loginAsGuest().catch(() => {});
     }
 
-    // Survival tick (runs alongside combat tick)
     let rafId: number;
     let lastTime = performance.now();
     const loop = () => {
@@ -183,18 +181,27 @@ export default function App() {
     rafId = requestAnimationFrame(loop);
 
     return () => cancelAnimationFrame(rafId);
-  }, [started]);
+  }, [started, initSurvival, survivalTick]);
+
+  // /play deep-link: auto-enter combat after first gesture-safe init
+  useEffect(() => {
+    if (!autoStart || started) return;
+    audioManager.init();
+    audioManager.startAmbient();
+    setStarted(true);
+    addLog('Welcome to GRIM ARMADA — /play', 'system');
+    addLog('WASD move · 1-4 skills · Z/X/C weapons · R cycle · Tab target · I bag · P panel', 'system');
+  }, [autoStart, started, addLog]);
 
   const handleStart = () => {
-    // Init audio on user gesture (required by browsers)
     audioManager.init();
     audioManager.startAmbient();
     audioManager.playUIClick();
 
     setStarted(true);
-    addLog('Welcome to GRUDA Wars — Survival Explorer', 'system');
-    addLog('WASD move · Tab toggle Combat/Harvest · I Inventory · P Character', 'system');
-    addLog('E to harvest resources · Shift+C to craft', 'system');
+    addLog('Welcome to GRIM ARMADA — Survival Explorer', 'system');
+    addLog('WASD move · 1-4 skills · Z/X/C weapons · R cycle · Tab target', 'system');
+    addLog('I Inventory · P Character · E harvest · Click canvas for look', 'system');
   };
 
   return (
@@ -223,5 +230,25 @@ export default function App() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+export default function App() {
+  const [loc] = useLocation();
+  // /play and /play/* skip title screen for production UI deploy
+  const isPlayRoute = loc === '/play' || loc.startsWith('/play/');
+
+  return (
+    <Switch>
+      <Route path="/play">
+        <PlaySession autoStart />
+      </Route>
+      <Route path="/play/:rest*">
+        <PlaySession autoStart />
+      </Route>
+      <Route>
+        <PlaySession autoStart={isPlayRoute} />
+      </Route>
+    </Switch>
   );
 }
